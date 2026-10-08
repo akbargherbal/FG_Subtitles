@@ -60,10 +60,24 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 
 - **Cleaning:** strip SRT indices, timestamps, `<i>`/HTML tags, `♪` lines. Normalise curly
   apostrophes (’ to '). Join wrapped lines with a space.
-- **Chunking:** 8 cues per chunk, stride 6 (2-cue overlap). Expect roughly 27k chunks. Keep episode id,
-  season, episode, start and end timestamps per chunk. Output `chunks.parquet`.
-- **FTS5:** build from the same chunks, rebuilt in under a second, so build on first run and
-  do not commit. Two tables or tokenizers: `unicode61` (exact) and `porter unicode61` (keyword).
+- **Chunking (default = scene-aware "gap" chunker, `chunker=gap`):**
+  1. Parse cleaned cues with start/end times in seconds.
+  2. Break between cues where the silence gap is >= 3.0 s (likely scene or shot change).
+  3. Merge any segment under 6 cues into its neighbour (the one across the smaller gap).
+  4. Split any segment over 30 cues into windows of 20 cues with a stride of 16 (4-cue overlap).
+  All thresholds (3.0, 6, 30, 20, 16) are constants at the top of `chunk.py`. They are starting
+  guesses from the measured gap distribution (median gap 0.07 s, p95 4.07 s; gap >= 3 s gives ~11k
+  raw segments with a very uneven size spread), not tuned values.
+  Two baselines are also built for comparison: `w8` (8 cues, stride 6) and `w20` (20 cues,
+  stride 15). Each chunker writes its own parquet (`chunks_gap.parquet`, `chunks_w8.parquet`,
+  `chunks_w20.parquet`).
+  Columns: `chunk_id`, `season`, `episode`, `start`, `end`, `cue_from`, `cue_to`, `n_cues`,
+  `chunker`, `text`. Every cue must appear in at least one chunk (check this in a test).
+  The chunker that goes forward is chosen in Phase 3 by the eval, per `PLAN.md`. Do not pick it by taste.
+- **FTS5:** build from the small `w8` chunks regardless of which chunker wins for embeddings, so
+  exact and keyword hits carry timestamps accurate to about 20 s. (A phrase split across a chunk
+  boundary is covered by the 2-cue overlap; test this.) Rebuilt in under a second, so build on
+  first run and do not commit. Two tables or tokenizers: `unicode61` (exact) and `porter unicode61` (keyword).
   `--exact` must use the unstemmed one. Escape/quote user input by default; expose raw FTS5 syntax
   (including `NEAR(a b, 5)`) only behind `--raw`.
 - **Models to compare:** `Qwen/Qwen3-Embedding-0.6B`, `Qwen/Qwen3-Embedding-4B` (fp16 on T4),
@@ -80,8 +94,8 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 
 - Vectors, `manifest.json` and the chosen model's metadata go to a Hugging Face **dataset** repo, not git.
   Ask the user for the repo name before creating it.
-- `manifest.json` must contain: model id, dimension, dtype, normalised flag, chunk count, chunking
-  parameters, file names, sizes, SHA-256, and a `chunks.parquet` hash so vectors and chunks cannot drift.
+- `manifest.json` must contain: model id, dimension, dtype, normalised flag, chunk count, chunker name and
+  all chunking parameters, file names, sizes, SHA-256, and the hash of the winning chunker's parquet so vectors and chunks cannot drift.
 - `search.py --semantic` flow:
   1. Check the cache (`~/.cache/fg_subtitles/`).
   2. If missing, read the manifest and **prompt**: index size plus embedding-model size, `[y/N]`
