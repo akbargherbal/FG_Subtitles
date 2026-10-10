@@ -187,3 +187,23 @@ existed from Phase 3). Wall times: Qwen 240.2 s, embeddinggemma 213.4 s, bge-sma
   config, far inside the 500 MB budget.
 - **CPU latency** figures are the Phase 0 measurements (2 threads, fp32): Qwen 779 ms,
   embeddinggemma 157 ms, bge-small 40 ms. All within the 2 s median budget.
+
+---
+
+## Phase 6 - Delivery (2026-10-10)
+
+- **HF dataset repo `akbargherbal/fg-subtitles-index` created private** (the user confirmed the name
+  and asked to keep it private). Contents: `embeddings.npy` (26.5 MB, fp16, 512-dim),
+  `chunks.parquet` (4.4 MB, copy of `chunks_w8.parquet`), `manifest.json`. `publish.py` builds the
+  index (MRL truncation + re-normalise + dtype cast) and the manifest, then uploads.
+- **manifest.json** carries the model id, dimension, dtype, `normalized`, count, chunker + all
+  chunking parameters, file names/sizes/SHA-256, the source parquet hash (identical to the uploaded
+  chunks hash, so vectors and chunks cannot drift), and the model download size.
+- **search.py semantic/hybrid**: on a cold cache it fetches `manifest.json`, prompts with
+  index+model sizes (unless `--yes`), downloads via `huggingface_hub` with `local_dir` (resumable),
+  verifies SHA-256, and only then loads. `--model` is refused when it differs from the manifest model.
+  Lexical modes never touch the network.
+- **Chunk text is only in the private repo**, never published publicly (per the AGENTS publishing
+  note); the code repo's visibility is unchanged.
+- Fresh-clone + empty-cache test passed end to end (evidence in `RESULTS.md`), including a
+  checksum-tamper recovery test.

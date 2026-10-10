@@ -273,3 +273,47 @@ All numbers from `python eval.py --embeddings emb_w8_<m> --torch-dtype <t> [--st
 Hybrid (RRF of w8 BM25 + embeddings) does not beat semantic-only for the winning model: same
 recall, lower MRR. Lexical-only alone is far behind. Recorded as-is; semantic-only is the best
 configuration here.
+
+## Delivery
+
+HF dataset repo: **`akbargherbal/fg-subtitles-index`** (created **private**; only the user may change
+visibility). Contents: `embeddings.npy` (25.7 MB), `chunks.parquet` (4.2 MB), `manifest.json`.
+`manifest.json` records model, dimension 512, dtype fp16, normalised=true, count 25910, chunker `w8`
++ all chunking parameters, file names/sizes/SHA-256, the winning chunker parquet hash
+(`source_parquet_sha256` == `chunks_sha256`, so vectors and chunks cannot drift), and the model
+download size.
+
+Cold-cache test from a **fresh `git clone`** of `origin/rag-search` with `~/.cache/fg_subtitles` emptied:
+
+```
+$ git clone -q --branch rag-search https://github.com/akbargherbal/FG_Subtitles.git /tmp/opencode/fresh
+$ rm -rf ~/.cache/fg_subtitles && cd /tmp/opencode/fresh
+$ python search.py --exact "hours in the snakepit" --limit 1          # offline, no network
+S01E01  00:00:16  [exact]  WILL BE 4 HOURS IN THE SNAKEPIT. ...
+$ python search.py --semantic "Peter does something foolish, gets more than he wished for, and regrets it" --yes --limit 3
+S12E01  00:17:51  [semantic]  ... It's not the treasure that matters. ...
+S01E06  00:12:02  [semantic]  ... I KEPT PUTTING MY MONEY IN. ...
+S10E01  00:20:08  [semantic]  ... Winning the lottery was the worst thing that ever happened ...
+real  0m27.0s
+```
+
+Prompt (shown when `--yes` is omitted) and abort:
+
+```
+$ python search.py --semantic "test"
+download index 31 MB + embedding model 1230 MB (~1261 MB total) from akbargherbal/fg-subtitles-index? [y/N] n
+aborted
+```
+
+Model-mismatch refusal:
+
+```
+$ python search.py --semantic "test" --model Qwen/Qwen3-Embedding-0.6B --yes
+error: query model 'Qwen/Qwen3-Embedding-0.6B' does not match the index model 'google/embeddinggemma-300m' in manifest.json
+```
+
+Checksum verification: appending bytes to the cached `embeddings.npy` made the next run re-download
+and re-verify; the on-disk SHA-256 matched the manifest again afterwards.
+
+Lexical modes on the fresh clone needed no network: `fts.db` is rebuilt locally from the committed
+`chunks_w8.parquet` on first run.

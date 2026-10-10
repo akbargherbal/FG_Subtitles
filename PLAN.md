@@ -57,11 +57,11 @@ They must never be mixed into headline numbers.
       (one query is 1/N of recall@10), so smaller differences are treated as noise.
 
 **Delivery**
-- [ ] Fresh clone + empty cache: `search.py --semantic "..."` prompts with sizes, downloads from Hugging Face,
+- [x] Fresh clone + empty cache: `search.py --semantic "..."` prompts with sizes, downloads from Hugging Face,
       verifies checksums, and returns results.
-- [ ] Search refuses to run if the query model does not match `manifest.json`.
-- [ ] `README.md` documents all modes with copy-pasteable examples and the Colab indexing steps.
-- [ ] Work is on branch `rag-search`. A push to `origin` happened at the end of every phase (check
+- [x] Search refuses to run if the query model does not match `manifest.json`.
+- [x] `README.md` documents all modes with copy-pasteable examples and the Colab indexing steps.
+- [x] Work is on branch `rag-search`. A push to `origin` happened at the end of every phase (check
       `git log origin/rag-search`). A draft PR against `main` was opened after Phase 1 and is marked
       ready at the end.
 
@@ -93,7 +93,7 @@ The phase is not done until the push succeeded.
   Record wall time per model. Do not run a model that failed the gate.
 - [x] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension
   comparison. Choose the final model by the model choice rule.
-- [ ] **6. Delivery.** Hugging Face upload and `manifest.json`; on-demand download flow in `search.py`; `README.md`; push; open PR.
+- [x] **6. Delivery.** Hugging Face upload and `manifest.json`; on-demand download flow in `search.py`; `README.md`; push; open PR.
 
 ## Deliverables
 
