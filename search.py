@@ -5,14 +5,21 @@ Lexical modes (``--exact``, ``--regex``) run fully offline against a local
 SQLite FTS5 index built from the committed ``chunks_w8.parquet``.  No embedding
 model and no network are needed for them.
 
-Semantic modes (``--semantic``, ``--hybrid``) need a downloaded index and model;
-they are wired up in the delivery phase.
+Semantic modes (``--semantic``, ``--hybrid``) download a prebuilt index and the
+query model from Hugging Face on first use (see ``--repo``); they refuse to run
+if ``--model`` differs from the index model in ``manifest.json``.
+
+Options include ``--limit``, ``--season``, ``--episode``, ``--json`` and
+``--no-dedupe`` (overlapping chunks from the same episode are collapsed by
+default).
 
 Examples
 --------
     python search.py --exact "hours in the snakepit"
     python search.py --exact "NEAR(peter lois, 4)" --raw
     python search.py --regex "shut up,? (meg|c hris)" -i
+    python search.py --semantic "Peter does something foolish and regrets it"
+    python search.py --exact "insists upon itself" --no-dedupe
 """
 from __future__ import annotations
 
