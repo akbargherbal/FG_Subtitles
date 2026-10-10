@@ -81,7 +81,7 @@ They must never be mixed into headline numbers.
 At the end of each phase: commit, update ticks in the same commit, **push to `origin rag-search`**.
 The phase is not done until the push succeeded.
 
-- [ ] **0. Model survey (about 30 minutes).** Survey Hugging Face per `AGENTS.md`, shortlist 2 to 3 models
+- [x] **0. Model survey (about 30 minutes).** Survey Hugging Face per `AGENTS.md`, shortlist 2 to 3 models
   including a small baseline, check each against the hardware gate (load and 2-thread latency on a handful
   of texts), log the shortlist and reasons in `DECISIONS.md`. No full embedding yet. Push.
 - [ ] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage, size rules
