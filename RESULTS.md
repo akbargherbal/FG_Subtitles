@@ -49,7 +49,39 @@ No full run attempted.
 
 ## Phase 1 - Chunking
 
-_pending_
+Command: `python chunk.py --all --report` (writes `chunks_gap.parquet`, `chunks_w8.parquet`,
+`chunks_w20.parquet`). Tests: `python -m pytest tests/test_chunk.py -q` -> **143 passed** (full corpus
+coverage per chunker; tail-window cases n = 31, 36, 37, 48; size rules).
+
+| chunker | chunks | episodes | n_cues min | p10 | median | p90 | max | tokens min | p10 | median | p90 | max |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gap | 10212 | 344 | 6 | 8 | 17 | 23 | 30 | 6 | 49 | 113 | 166 | 293 |
+| w8 | 25910 | 344 | 4 | 8 | 8 | 8 | 9 | 8 | 41 | 54 | 68 | 115 |
+| w20 | 10332 | 344 | 10 | 20 | 20 | 20 | 24 | 45 | 109 | 136 | 161 | 207 |
+
+- Coverage: every cue appears in >= 1 chunk for all three chunkers (tested).
+- `gap` size rule: no chunk exceeds 30 cues; **0** chunks under 6 cues (no episode is too short:
+  all 344 episodes have >= 1 chunk and the smallest episode still yields 20 chunks).
+- Parsing: 344 episodes parsed, 0 left empty after cleaning (♪ lines dropped).
+- File sizes: `chunks_gap.parquet` 3.79 MB, `chunks_w8.parquet` 4.36 MB, `chunks_w20.parquet` 3.95 MB.
+- Chunker **comparison** (which one goes forward) is Phase 3.
+
+Exact `--report` output:
+
+```
+wrote 10212 chunks -> /content/FG_Subtitles/chunks_gap.parquet
+chunker=gap  chunks=10212  episodes=344
+  n_cues  min=6 p10=8 median=17 p90=23 max=30 mean=16.2
+  tokens  min=6 p10=49 median=113 p90=166 max=293 mean=110.1
+wrote 25910 chunks -> /content/FG_Subtitles/chunks_w8.parquet
+chunker=w8  chunks=25910  episodes=344
+  n_cues  min=4 p10=8 median=8 p90=8 max=9 mean=8.0
+  tokens  min=8 p10=41 median=54 p90=68 max=115 mean=54.3
+wrote 10332 chunks -> /content/FG_Subtitles/chunks_w20.parquet
+chunker=w20  chunks=10332  episodes=344
+  n_cues  min=10 p10=20 median=20 p90=20 max=24 mean=19.9
+  tokens  min=45 p10=109 median=136 p90=161 max=207 mean=135.4
+```
 
 ## Lexical search
 

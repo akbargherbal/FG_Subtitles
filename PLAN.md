@@ -30,10 +30,10 @@ They must never be mixed into headline numbers.
 - [ ] Lexical modes work offline with no embedding model installed.
 
 **Chunking**
-- [ ] Three chunkers built (`gap`, `w8`, `w20`) per `AGENTS.md`; each cue appears in at least one chunk (tested).
+- [x] Three chunkers built (`gap`, `w8`, `w20`) per `AGENTS.md`; each cue appears in at least one chunk (tested).
       Tail-window cases (n = 31, 36, 37, 48 cues) are tested per the tail rule in `AGENTS.md`.
-- [ ] For each chunker, report chunk count and the distribution of n_cues and tokens (min, p10, median, p90, max).
-- [ ] No `gap` chunk exceeds 30 cues or is under 6 cues, except where an episode is too short to satisfy this (report any exceptions).
+- [x] For each chunker, report chunk count and the distribution of n_cues and tokens (min, p10, median, p90, max).
+- [x] No `gap` chunk exceeds 30 cues or is under 6 cues, except where an episode is too short to satisfy this (report any exceptions).
 - [ ] Chunker comparison done with the Phase 0 baseline model (the small model, default
       Qwen3-Embedding-0.6B) on the user's eval queries, reported in `RESULTS.md`.
       `gap` stays the default unless another chunker beats it on recall@10 by at least 0.10 absolute **and**
@@ -84,7 +84,7 @@ The phase is not done until the push succeeded.
 - [x] **0. Model survey (about 30 minutes).** Survey Hugging Face per `AGENTS.md`, shortlist 2 to 3 models
   including a small baseline, check each against the hardware gate (load and 2-thread latency on a handful
   of texts), log the shortlist and reasons in `DECISIONS.md`. No full embedding yet. Push.
-- [ ] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage, size rules
+- [x] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage, size rules
   and tail-window cases; report distributions. After the first push, open the draft PR against `main`.
 - [ ] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
 - [ ] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with the baseline model (CPU allowed). Sanity check on the smoke set.

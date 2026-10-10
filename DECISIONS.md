@@ -63,3 +63,29 @@ no MRL), `mixedbread-ai/mxbai-embed-large-v1` (335M), `ibm-granite/granite-embed
 on this T4 / 12 GiB / 2 vCPU box: they load to GPU, and run warm queries on 2 CPU threads well
 inside the <= 2 s median and <= 6 GB RAM budgets. Qwen at fp32 on CPU peaks at ~5.35 GB RSS, the
 closest to the 6 GB ceiling.
+
+---
+
+## Phase 1 - Chunking (2026-10-10)
+
+Implemented exactly to the `AGENTS.md` spec; all constants (3.0, 6, 30, 20, 16, and the
+`w8`/`w20` window/stride/tail values) are named constants at the top of `chunk.py`. Ambiguities
+resolved (logged as required by rule 2):
+
+- **♪ lines.** "strip ... `♪` lines" is implemented as *dropping the whole line* when it contains
+  `♪`/`♫` (a song-lyric cue), not merely removing the symbol. Rationale: the symbol wraps lyrics and
+  removing just the symbol would leave song text in the corpus. 0 episodes become empty as a result.
+- **Half-open spans.** `cue_from` is inclusive and `cue_to` is exclusive (`n_cues = cue_to - cue_from`),
+  matching Python slicing.
+- **Merge tie-break.** When a small segment's left and right gaps are equal it merges *left*.
+  The spec does not define a tie-break; this makes it deterministic.
+- **Cues with empty text after cleaning are dropped** before chunking, so cue indices refer to the
+  cleaned cue list. In practice 0 cues are dropped (344/344 episodes keep all their cues).
+- **Deliverable storage.** `chunks_*.parquet` are committed (PLAN lists them as deliverables, rule 7
+  only forbids vectors/`.npy`/`fts.db`); vectors and the FTS index are git-ignored. Each parquet is
+  ~4 MB, well under the 50 MB limit.
+
+Observations: 10212 gap chunks, 25910 w8 chunks, 10332 w20 chunks. `gap` chunk sizes are bounded
+6-30 cues; the merge-then-split path can extend the last window to at most 21 cues (tail < 6 plus a
+16-cue stride), still under the 30 ceiling. No undersized chunks at all - no episode is short enough
+to trigger the "too short" exception.

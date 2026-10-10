@@ -6,7 +6,9 @@ subs/
 
 # Phase 1+ artifacts: never commit vectors, arrays or the FTS index.
 *.npy
-*.parquet
+*.npz
+*.faiss
 fts.db
-shards/
+_shards/
+vectors/
 cache/
