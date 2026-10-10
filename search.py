@@ -139,6 +139,26 @@ def search_porter(query: str, limit: int = 10, season=None, episode=None,
     return [dict(r, mode="porter") for r in rows]
 
 
+def search_keyword(query: str, limit: int = 10, season=None, episode=None,
+                   db_path: Path = FTS_PATH) -> list[dict]:
+    """BM25 keyword search: OR of the porter-stemmed query terms.
+
+    Used as the lexical-only baseline and the keyword half of hybrid.
+    """
+    tokens = re.findall(r"[A-Za-z0-9']+", normalise(query))
+    if not tokens:
+        return []
+    match = " OR ".join(f'"{t}"' for t in tokens)
+    con = _connect(db_path)
+    try:
+        rows = _fts_rows(con, "chunks_porter", match, limit, season, episode)
+    except sqlite3.OperationalError:
+        con.close()
+        return []
+    con.close()
+    return [dict(r, mode="keyword") for r in rows]
+
+
 def search_regex(pattern: str, limit: int = 50, ignore_case: bool = False,
                  season=None, episode=None, db_path: Path = FTS_PATH) -> list[dict]:
     """Python ``re`` over the cleaned cue text (not chunked)."""

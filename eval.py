@@ -105,7 +105,7 @@ def semantic_rank(vectors: np.ndarray, chunks: pd.DataFrame, qemb: np.ndarray,
 def lexical_rank(queries, k: int = 10, db_path: Path = search.FTS_PATH) -> list[list[dict]]:
     out = []
     for q in queries:
-        rows = search.search_porter(q["query"], limit=k, db_path=db_path)
+        rows = search.search_keyword(q["query"], limit=k, db_path=db_path)
         out.append([dict(r) for r in rows])
     return out
 
@@ -144,7 +144,8 @@ def run_sanity(emb_dir: Path, model_id: str | None, n: int = 50, seed: int = 0, 
 
 def evaluate(emb_dir: Path | None, queries_path: Path, mode: str = "semantic",
              k: int = 10, query_model: str | None = None,
-             torch_dtype: str = "auto", device: str | None = None) -> dict:
+             torch_dtype: str = "auto", device: str | None = None,
+             storage_dtype: str | None = None, dim: int | None = None) -> dict:
     queries = json.loads(Path(queries_path).read_text())
     n_synth = sum(1 for q in queries if q.get("synthetic"))
     sem_rows = lex_rows = None
@@ -155,6 +156,7 @@ def evaluate(emb_dir: Path | None, queries_path: Path, mode: str = "semantic",
         qemb = embed_queries([q["query"] for q in queries], model_id,
                              torch_dtype=torch_dtype, device=device,
                              max_seq_length=meta.get("max_seq_length", 512))
+        vectors, qemb = apply_variant(vectors, qemb, storage_dtype, dim)
         sem_rows = semantic_rank(vectors, chunks, qemb, k=k)
     if mode in ("lexical", "hybrid"):
         lex_rows = lexical_rank(queries, k=k)
@@ -164,9 +166,32 @@ def evaluate(emb_dir: Path | None, queries_path: Path, mode: str = "semantic",
     metrics = rank_metrics(rows, queries, k=k)
     metrics.update({"mode": mode, "k": k, "synthetic": n_synth, "total_queries": len(queries)})
     if meta:
-        metrics.update({"model": meta["model"], "dim": meta["dim"], "dtype": meta["dtype"],
-                        "chunker": meta["chunker"]})
+        v = vectors
+        metrics.update({"model": meta["model"], "dim": int(v.shape[1]),
+                        "dtype": storage_dtype or meta["dtype"], "chunker": meta["chunker"],
+                        "index_bytes": int(v.size * v.dtype.itemsize)})
     return metrics
+
+
+def _renorm(v: np.ndarray) -> np.ndarray:
+    n = np.linalg.norm(v, axis=1, keepdims=True)
+    return (v / np.clip(n, 1e-12, None)).astype(np.float32)
+
+
+def apply_variant(vectors: np.ndarray, qemb: np.ndarray,
+                  storage_dtype: str | None, dim: int | None):
+    """Optionally truncate (MRL) and/or cast storage dtype, renormalising."""
+    v = vectors.astype(np.float32)
+    q = qemb.astype(np.float32)
+    if dim:
+        v = _renorm(v[:, :dim])
+        q = _renorm(q[:, :dim])
+    if storage_dtype == "float16":
+        v = v.astype(np.float16)
+        q = q.astype(np.float16)
+    elif storage_dtype == "float32":
+        v = v.astype(np.float32)
+    return v, q
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -179,6 +204,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--query-model", default=None)
     ap.add_argument("--torch-dtype", default="auto",
                     choices=["auto", "float16", "bfloat16", "float32"])
+    ap.add_argument("--storage", default=None, choices=["float16", "float32"],
+                    help="cast stored vectors before scoring (fp16 vs fp32 storage test)")
+    ap.add_argument("--dim", type=int, default=None,
+                    help="truncate vectors to this dimension (MRL test)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--sanity", type=int, default=0)
     ap.add_argument("--json", action="store_true")
@@ -191,12 +220,15 @@ def main(argv: list[str] | None = None) -> int:
               f"({args.embeddings})")
         return 0
     m = evaluate(Path(args.embeddings) if args.embeddings else None, Path(args.queries),
-                 args.mode, args.topk, args.query_model, args.torch_dtype, args.device)
+                 args.mode, args.topk, args.query_model, args.torch_dtype, args.device,
+                 args.storage, args.dim)
     if args.json:
         print(json.dumps(m, indent=2))
     else:
         print(f"mode={m['mode']} chunker={m.get('chunker')} model={m.get('model')} "
-              f"n={m['n']} recall@{m['k']}={m['recall@%d' % m['k']]:.3f} MRR={m['mrr']:.3f}")
+              f"dim={m.get('dim')} dtype={m.get('dtype')} n={m['n']} "
+              f"recall@{m['k']}={m['recall@%d' % m['k']]:.3f} MRR={m['mrr']:.3f} "
+              f"index_MB={m.get('index_bytes', 0)/1e6:.1f}")
         for pq in m["per_query"]:
             print(f"  {'HIT ' if pq['rank'] else 'miss'} rank={pq['rank']}  {pq['query']}")
     return 0

@@ -204,6 +204,72 @@ w20 : -  -  -  -  -  1  -  -  -  -  -  -  -  2  -  1  1  1  2  -
 
 ## Phase 4/5 - Full embedding and evaluation
 
-| model | dtype | dim | recall@10 | MRR | index size | query-model download | query latency (CPU) |
-|---|---|---|---|---|---|---|---|
-| _pending_ | | | | | | | |
+Winning chunker: **w8** (Phase 3). Full embedding commands (all w8):
+```
+$ python embed.py --model Qwen/Qwen3-Embedding-0.6B   --chunks chunks_w8.parquet --out emb_w8_qwen  --dtype float32 --torch-dtype float16 --batch-size 128 --shard-size 8192   # 240.2 s
+$ python embed.py --model google/embeddinggemma-300m  --chunks chunks_w8.parquet --out emb_w8_gemma --dtype float32 --torch-dtype float32 --batch-size 96  --shard-size 8192   # 213.4 s
+$ python embed.py --model BAAI/bge-small-en-v1.5      --chunks chunks_w8.parquet --out emb_w8_bge   --dtype float32 --torch-dtype float32 --batch-size 256 --shard-size 8192   # 46.3 s
+```
+
+Verbatim sanity (`python eval.py --embeddings emb_w8_<m> --sanity 50`), winning chunker, 50 random
+chunks (>= 0.95 required): Qwen **1.000**, embeddinggemma **1.000**, bge-small **1.000**.
+
+Model download sizes are real weight-file sizes from the Hub; CPU latency is the Phase 0 measured
+median warm query on 2 threads (fp32). Index size is the vector file only.
+
+### Final table (semantic, `python eval.py --embeddings emb_w8_<m> ...`)
+
+| model | dtype | dim | recall@10 | MRR | index size | query-model download | query latency (2 CPU threads) | gate |
+|---|---|---|---|---|---|---|---|---|
+| Qwen/Qwen3-Embedding-0.6B | fp16 | 1024 | 0.500 | 0.373 | 53.1 MB | 1191.6 MB | 779 ms | pass |
+| **google/embeddinggemma-300m** | **fp16** | **512** | **0.550** | **0.424** | **26.5 MB** | 1211.5 MB | 157 ms | pass |
+| BAAI/bge-small-en-v1.5 | fp16 | 384 | 0.250 | 0.225 | 19.9 MB | 133.5 MB | 40 ms | pass |
+| BAAI/bge-m3 | - | 1024 | - | - | - | 2271.1 MB | - | **excluded** (download > 2 GB) |
+
+**Model choice (rule in PLAN.md).** Smallest passing model = bge-small (0.250). It is replaced by a
+larger model only on a >= 0.10 absolute recall@10 gain with no MRR loss:
+- embeddinggemma vs bge-small: +0.300 recall, +0.199 MRR -> **replaces**.
+- Qwen vs embeddinggemma: recall 0.500 < 0.550 (no gain) -> **does not replace**.
+
+Final model = **google/embeddinggemma-300m** (dim 512 via MRL, fp16 storage). It is also the
+fastest on CPU (157 ms) and has the highest recall@10 and MRR.
+
+### fp16 vs fp32 storage and full vs truncated dimension
+
+All numbers from `python eval.py --embeddings emb_w8_<m> --torch-dtype <t> [--storage ...] [--dim N]`.
+
+| model | dim | storage | recall@10 | MRR | index size |
+|---|---|---|---|---|---|
+| Qwen3-Embedding-0.6B | 1024 | fp32 | 0.500 | 0.373 | 106.1 MB |
+| Qwen3-Embedding-0.6B | 1024 | fp16 | 0.500 | 0.373 | 53.1 MB |
+| Qwen3-Embedding-0.6B | 512 | fp16 | 0.450 | 0.336 | 26.5 MB |
+| embeddinggemma-300m | 768 | fp32 | 0.550 | 0.368 | 79.6 MB |
+| embeddinggemma-300m | 768 | fp16 | 0.550 | 0.368 | 39.8 MB |
+| embeddinggemma-300m | 512 | fp32 | 0.550 | 0.424 | 53.1 MB |
+| embeddinggemma-300m | **512** | **fp16** | **0.550** | **0.424** | **26.5 MB** |
+| embeddinggemma-300m | 256 | fp32 | 0.450 | 0.285 | 26.5 MB |
+| bge-small-en-v1.5 | 384 | fp32 | 0.250 | 0.225 | 39.8 MB |
+| bge-small-en-v1.5 | 384 | fp16 | 0.250 | 0.225 | 19.9 MB |
+
+- **fp16 storage loses nothing** at this scale for any finalist (identical recall@10 and MRR), so we
+  store fp16 and halve the index.
+- **MRL truncation**: Qwen 1024->512 costs recall (-0.050); embeddinggemma 768->512 is free on recall
+  and slightly better on MRR; embeddinggemma 512->256 costs recall (-0.100). Chosen: gemma @ 512.
+  (bge-small has no MRL.)
+
+### hybrid vs semantic-only vs lexical-only (same 20 queries)
+
+| system | recall@10 | MRR |
+|---|---|---|
+| lexical-only (porter BM25, w8) | 0.300 | 0.152 |
+| semantic-only, Qwen @1024 | 0.500 | 0.373 |
+| semantic-only, gemma @768 | 0.550 | 0.368 |
+| semantic-only, **gemma @512 (final)** | **0.550** | **0.424** |
+| hybrid, Qwen @1024 | 0.450 | 0.325 |
+| hybrid, gemma @768 | 0.550 | 0.310 |
+| hybrid, gemma @512 | 0.550 | 0.367 |
+| hybrid, bge @384 | 0.350 | 0.233 |
+
+Hybrid (RRF of w8 BM25 + embeddings) does not beat semantic-only for the winning model: same
+recall, lower MRR. Lexical-only alone is far behind. Recorded as-is; semantic-only is the best
+configuration here.

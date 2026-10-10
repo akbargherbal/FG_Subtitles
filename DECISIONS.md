@@ -159,3 +159,31 @@ meets both conditions and **w8 is the winning chunker**. This is exactly on the 
 fragile: moving one query out of w8's top-10 drops the gain to +0.050 and would keep `gap`. Because
 the query set is synthetic and small, we note this but follow the rule as written. Verbatim sanity
 for all three chunkers is 1.000 @ 50 chunks.
+
+---
+
+## Phase 4/5 - Full embedding and evaluation (2026-10-10)
+
+Full w8 embedding for the two remaining finalists plus an fp32-storage Qwen set (Qwen w8 fp16 already
+existed from Phase 3). Wall times: Qwen 240.2 s, embeddinggemma 213.4 s, bge-small 46.3 s.
+
+**Decisions**
+
+- **fp16 storage is used for the index.** Casting the fp32 vectors to fp16 changed neither recall@10
+  nor MRR for any finalist, and halves the index. Casting is a faithful storage test (same underlying
+  vectors), so no re-embedding was needed.
+- **MRL truncation to 512 for EmbeddingGemma.** 768->512 left recall unchanged (0.550) and moved MRR
+  from 0.368 to 0.424; 512->256 lost 0.100 recall. We therefore ship gemma at 512 (fp16, 26.5 MB).
+  Qwen 1024->512 lost 0.050 recall, so its best bitrate is the full 1024. bge-small has no MRL.
+- **Final model = `google/embeddinggemma-300m`.** By the PLAN rule: start from the smallest passing
+  model (bge-small); gemma gains +0.300 recall@10 with no MRR loss and replaces it; Qwen does not
+  gain on recall over gemma, so it does not replace. gemma also has the lowest CPU latency (157 ms).
+  Licence caveat: EmbeddingGemma is under the **gemma licence** (gated, already accepted by the
+  account); the licence is recorded in the manifest. This is not part of the model-choice rule.
+- **Hybrid under-performs semantic-only for the winner** (same recall, MRR 0.367 vs 0.424), so the
+  recommended default mode is `--semantic`. `--hybrid` still ships and works.
+- **"Index size"** in `RESULTS.md` is the vector file only. The actual download also carries
+  `chunks_used.parquet` (~4.3 MB), `manifest.json` and model metadata; total ~31 MB for the final
+  config, far inside the 500 MB budget.
+- **CPU latency** figures are the Phase 0 measurements (2 threads, fp32): Qwen 779 ms,
+  embeddinggemma 157 ms, bge-small 40 ms. All within the 2 s median budget.

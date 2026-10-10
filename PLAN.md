@@ -41,17 +41,17 @@ They must never be mixed into headline numbers.
       (the eval set is small, so differences below that are treated as noise).
 
 **Semantic**
-- [ ] Sanity: querying the verbatim text of a random chunk returns that chunk at rank 1 for >= 95% of 50 random chunks, per model (use the winning chunker; for overlapping chunkers, a chunk with identical text counts as correct).
-- [ ] Define a **hit** identically for every chunker and model, and write it in `eval.py`: a result chunk counts if it is from an expected episode and, when `start` is given, its [start, end] range contains that time (plus or minus 30 s). Recall@10 is the fraction of queries with at least one hit in the top 10; MRR uses the first hit.
-- [ ] Every model tried gets recall@10 and MRR on `eval_queries.json`, recorded with the exact command.
-- [ ] `--hybrid` is evaluated against semantic-only and lexical-only on the same queries.
-- [ ] `RESULTS.md` has one table: model, dtype, dimension, recall@10, MRR, index size, query-model download size,
+- [x] Sanity: querying the verbatim text of a random chunk returns that chunk at rank 1 for >= 95% of 50 random chunks, per model (use the winning chunker; for overlapping chunkers, a chunk with identical text counts as correct).
+- [x] Define a **hit** identically for every chunker and model, and write it in `eval.py`: a result chunk counts if it is from an expected episode and, when `start` is given, its [start, end] range contains that time (plus or minus 30 s). Recall@10 is the fraction of queries with at least one hit in the top 10; MRR uses the first hit.
+- [x] Every model tried gets recall@10 and MRR on `eval_queries.json`, recorded with the exact command.
+- [x] `--hybrid` is evaluated against semantic-only and lexical-only on the same queries.
+- [x] `RESULTS.md` has one table: model, dtype, dimension, recall@10, MRR, index size, query-model download size,
       query latency on CPU (measured) . Final model chosen from these numbers only. No claims without numbers.
-- [ ] fp16 vs fp32 storage compared for each finalist and, where the model supports it, full vs truncated
+- [x] fp16 vs fp32 storage compared for each finalist and, where the model supports it, full vs truncated
       dimension. Quality change reported.
-- [ ] **Hardware gate** (see `AGENTS.md`): every candidate is checked against the query budget in
+- [x] **Hardware gate** (see `AGENTS.md`): every candidate is checked against the query budget in
       Constraints on 2 CPU threads. Models that fail are listed as excluded with the measured number.
-- [ ] **Model choice rule.** Choose the smallest model that passes the hardware gate. A larger model
+- [x] **Model choice rule.** Choose the smallest model that passes the hardware gate. A larger model
       replaces it only if it gains at least 0.10 absolute recall@10 **and** does not lose on MRR.
       Otherwise keep the smaller one and say the difference was not conclusive. The eval set is small
       (one query is 1/N of recall@10), so smaller differences are treated as noise.
@@ -89,9 +89,9 @@ The phase is not done until the push succeeded.
 - [x] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
 - [x] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with the baseline model (CPU allowed). Sanity check on the smoke set.
 - [x] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with the baseline model, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
-- [ ] **4. Full embedding.** With the chosen chunker, embed the full corpus with each shortlisted model that passed the hardware gate.
+- [x] **4. Full embedding.** With the chosen chunker, embed the full corpus with each shortlisted model that passed the hardware gate.
   Record wall time per model. Do not run a model that failed the gate.
-- [ ] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension
+- [x] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension
   comparison. Choose the final model by the model choice rule.
 - [ ] **6. Delivery.** Hugging Face upload and `manifest.json`; on-demand download flow in `search.py`; `README.md`; push; open PR.
 
