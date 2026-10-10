@@ -34,7 +34,7 @@ They must never be mixed into headline numbers.
       Tail-window cases (n = 31, 36, 37, 48 cues) are tested per the tail rule in `AGENTS.md`.
 - [x] For each chunker, report chunk count and the distribution of n_cues and tokens (min, p10, median, p90, max).
 - [x] No `gap` chunk exceeds 30 cues or is under 6 cues, except where an episode is too short to satisfy this (report any exceptions).
-- [ ] Chunker comparison done with the Phase 0 baseline model (the small model, default
+- [x] Chunker comparison done with the Phase 0 baseline model (the small model, default
       Qwen3-Embedding-0.6B) on the user's eval queries, reported in `RESULTS.md`.
       `gap` stays the default unless another chunker beats it on recall@10 by at least 0.10 absolute **and**
       does not lose on MRR; otherwise keep `gap` and say the difference was not conclusive
@@ -88,7 +88,7 @@ The phase is not done until the push succeeded.
   and tail-window cases; report distributions. After the first push, open the draft PR against `main`.
 - [x] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
 - [x] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with the baseline model (CPU allowed). Sanity check on the smoke set.
-- [ ] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with the baseline model, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
+- [x] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with the baseline model, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
 - [ ] **4. Full embedding.** With the chosen chunker, embed the full corpus with each shortlisted model that passed the hardware gate.
   Record wall time per model. Do not run a model that failed the gate.
 - [ ] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension

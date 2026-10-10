@@ -166,7 +166,41 @@ single shard suffices; the multi-shard path is exercised in Phase 4.
 
 ## Phase 3 - Chunker comparison
 
-_pending_
+Queries: `eval_queries.json` (20 entries) - **all synthetic** (`"synthetic": true`), generated from
+real chunks because the user's file was absent and the user chose this option. These are *not*
+user-verified; headline numbers below are therefore on synthetic queries only.
+
+Baseline model: `Qwen/Qwen3-Embedding-0.6B`, fp16, one embedding set per chunker.
+
+Commands:
+```
+$ python embed.py --model Qwen/Qwen3-Embedding-0.6B --chunks chunks_<c>.parquet \
+      --out emb_<c> --dtype float16 --torch-dtype float16 --batch-size 128 --shard-size 8192
+$ python eval.py --embeddings emb_<c> --torch-dtype float16
+$ python eval.py --embeddings emb_<c> --sanity 50 --torch-dtype float16
+```
+
+| chunker | chunks | embed wall (s) | recall@10 | MRR | hits | sanity rank1 (50) |
+|---|---|---|---|---|---|---|
+| **gap** | 10212 | 157.1 | 0.400 | 0.246 | 8/20 | 1.000 |
+| **w8** | 25910 | 243.1 | **0.500** | **0.373** | 10/20 | 1.000 |
+| **w20** | 10332 | 213.7 | 0.300 | 0.250 | 6/20 | 1.000 |
+
+**Selection (rule in PLAN.md):** w8 beats gap by `0.500 - 0.400 = 0.100` absolute recall@10
+(exactly the 0.10 threshold: 2 of 20 queries) **and** does not lose on MRR (0.373 > 0.246).
+Therefore **w8 is the winning chunker** and is used for the full embedding and evaluation.
+Caveat recorded in `DECISIONS.md`: the margin is exactly at the threshold and rests on synthetic
+queries, so a single query flips it.
+
+Verbatim sanity (>= 95% required) passes for all three chunkers: 1.000 over 50 random chunks each.
+
+Per-query ranks in query order (`-` = miss):
+
+```
+gap : -  -  -  -  -  1  -  -  2  -  -  3  -  4  -  3  2  1  1  -
+w8  : -  -  9  -  -  1  -  1  -  -  -  4  -  1  -  1  1  1  1 10
+w20 : -  -  -  -  -  1  -  -  -  -  -  -  -  2  -  1  1  1  2  -
+```
 
 ## Phase 4/5 - Full embedding and evaluation
 

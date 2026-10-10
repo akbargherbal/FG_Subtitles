@@ -133,3 +133,29 @@ always aligns with the `chunks_used.parquet` written alongside it. This row alig
   `embeddings_sha256`; `--no-resume` rebuilt to the same hash.
 - `--sanity N` embeds N random chunks' own text as queries and reports the rank-1 rate; on the 40-chunk
   smoke set it is 1.000 (20/20). The full 50-chunk, per-model sanity check is Phase 5.
+
+---
+
+## Phase 3 - Chunker comparison (2026-10-10)
+
+**Input deviation (user-approved).** `eval_queries.json` was missing at the start of Phase 3, so per
+`PLAN.md` we stopped and asked. The user chose "generate synthetic queries". We therefore generated
+**20** queries from real `gap` chunks across 20 different episodes (S01-S15), each labelled
+`"synthetic": true`, and report them as synthetic everywhere. No human-verified headline numbers
+exist for this project; the Phase 3 and Phase 5 tables are synthetic-only. Each query's `expected`
+is the source chunk's episode + start, so it is self-consistent but not validated by a person.
+
+**Result.** Baseline `Qwen/Qwen3-Embedding-0.6B`, fp16, on the 20 synthetic queries:
+
+| chunker | recall@10 | MRR |
+|---|---|---|
+| gap | 0.400 | 0.246 |
+| **w8** | **0.500** | **0.373** |
+| w20 | 0.300 | 0.250 |
+
+The PLAN rule: switch away from `gap` only if a chunker gains **>= 0.10 absolute recall@10** and
+does **not lose MRR**. `w8` gains exactly **+0.100** (10/20 vs 8/20) and gains +0.127 MRR, so it
+meets both conditions and **w8 is the winning chunker**. This is exactly on the threshold, so it is
+fragile: moving one query out of w8's top-10 drops the gain to +0.050 and would keep `gap`. Because
+the query set is synthetic and small, we note this but follow the rule as written. Verbatim sanity
+for all three chunkers is 1.000 @ 50 chunks.
