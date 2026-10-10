@@ -24,14 +24,16 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 
 ## Environment
 
-- You run inside a Google Colab terminal on a T4 (16 GB). Colab runtimes die; only Google Drive
-  and GitHub persist.
+- You run inside a Google Colab terminal on a T4 (16 GB VRAM) with **~12 GB system RAM and 2 vCPU**.
+  Colab runtimes die; only Google Drive and GitHub persist. Check `nvidia-smi`, `free -h` and `nproc`
+  at the start and log what you actually got in `DECISIONS.md`.
 - Work in the repo checkout on Drive, or write all shards and outputs to Drive. Anything on local
   Colab disk can vanish.
 - The user is authenticated with GitHub and Hugging Face. Use the existing credentials. Never print,
   log or write tokens to any file.
-- Target for end users: CPU-only machine (8 vCPU / 32 GB) is acceptable for **queries**.
-  Indexing is a one-time T4 job.
+- Target for end users: a small CPU-only machine (**2 vCPU / ~12 GB**, same as this Colab) for
+  **queries**. Indexing is a one-time T4 job. The model used for queries ships to the end user, so
+  its download size, RAM and latency are product costs, not just Colab costs.
 - Check FTS5 is available in this Python's `sqlite3` before relying on it.
 
 ## Rules
@@ -41,8 +43,10 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 2. **Acceptance criteria in `PLAN.md` are fixed.** You may change the implementation, but log every
    deviation in `DECISIONS.md` (what, why, date). Do not edit criteria yourself. If one is
    impossible, write `BLOCKED.md` and ask.
-3. **Work in phases.** Commit after each phase, tick its box in `PLAN.md`, then continue to the next phase
-   unless a stop condition below applies.
+3. **Work in phases.** At the end of each phase: commit, tick its box in `PLAN.md`, **push to
+   `origin rag-search`**, then continue to the next phase unless a stop condition below applies.
+   A phase is not done until the push has succeeded. Also push before any long job (full embedding,
+   large downloads). GitHub is the only durable copy of the work.
 4. **Resumable.** If the session dies, the next session reads `PLAN.md` and resumes at the first
    unchecked item. Keep `PLAN.md` ticks truthful.
 5. **Blocked rule.** Same problem unresolved after 3 distinct attempts: write `BLOCKED.md`
@@ -50,11 +54,20 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 6. **Stop and ask** before: deleting anything, force-pushing, changing repo visibility,
    publishing anything to Hugging Face under a name the user has not confirmed, or spending
    more than one hour on a single step.
-7. **Git hygiene.** Work on branch `rag-search`. Never force-push. No file over 50 MB committed. No vectors,
-   `.npy` files, or `fts.db` in git. Add them to `.gitignore`.
-8. **Verify, don't recall.** Model-card details (prompt names, dtype warnings, output
+7. **Git hygiene.** Work on branch `rag-search`. Push after every phase (rule 3). Open a **draft PR**
+   against `main` right after the first push, and keep pushing to it; mark it ready only at the end.
+   Never force-push. No file over 50 MB committed. No vectors, `.npy` files, or `fts.db` in git.
+   Add them to `.gitignore`. If a push fails, treat it as a blocker (rule 5), not something to defer.
+8. **Verify, don't recall.** Model-card details (model IDs, prompt names, dtype warnings, output
    dimensions, licences) must be read from the card or the library at run time. Do not trust
    this file or memory when they disagree.
+9. **Reuse, don't reinvent.** Hugging Face already hosts strong, well-benchmarked embedding models.
+   Pick from them (see "Model selection"). Do not train, fine-tune, distil or hand-build an embedding
+   model, and do not write custom inference code where `sentence-transformers` already works.
+   The code that is genuinely ours: chunkers, FTS5 index, eval harness, CLI.
+10. **Time-box exploration.** If you are reading, comparing or debugging something that is not on the
+    critical path for the current phase and it has taken more than ~30 minutes, stop, log what you
+    know in `DECISIONS.md`, and take the simplest option that satisfies the criteria.
 
 ## Technical decisions already made
 
@@ -65,6 +78,12 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
   2. Break between cues where the silence gap is >= 3.0 s (likely scene or shot change).
   3. Merge any segment under 6 cues into its neighbour (the one across the smaller gap).
   4. Split any segment over 30 cues into windows of 20 cues with a stride of 16 (4-cue overlap).
+     Generate windows at starts 0, 16, 32, ... while `start + 20 < n`; the last window is `[start, n)`.
+     **Tail rule:** if that last window has fewer than 6 cues, extend the previous window to `n` instead
+     of emitting it (e.g. n = 37 gives `[0,20) [16,37)`, not a 5-cue tail). Test with n = 31, 36, 37, 48
+     and check that coverage is complete and no window is under 6 cues.
+     The `w8` and `w20` baselines apply the same tail rule per episode, with the threshold at half the
+     window size (4 and 10 cues). An episode with fewer cues than the window size becomes one chunk.
   All thresholds (3.0, 6, 30, 20, 16) are constants at the top of `chunk.py`. They are starting
   guesses from the measured gap distribution (median gap 0.07 s, p95 4.07 s; gap >= 3 s gives ~11k
   raw segments with a very uneven size spread), not tuned values.
@@ -80,13 +99,29 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
   first run and do not commit. Two tables or tokenizers: `unicode61` (exact) and `porter unicode61` (keyword).
   `--exact` must use the unstemmed one. Escape/quote user input by default; expose raw FTS5 syntax
   (including `NEAR(a b, 5)`) only behind `--raw`.
-- **Models to compare:** `Qwen/Qwen3-Embedding-0.6B`, `Qwen/Qwen3-Embedding-4B` (fp16 on T4),
-  `google/embeddinggemma-2` (fp32 on T4; do not use fp16). Optionally `BAAI/bge-m3`.
-- **Qwen queries** take an instruction prefix (`Instruct: {task}\nQuery: {query}`); documents get
-  none. Use sentence-transformers `prompt_name="query"` if the card supports it. Try one or two task
-  wordings and record which you used.
-- **Storage:** L2-normalise; store as `.npy`. Test fp32 vs fp16, and 4B at full vs truncated
-  dimension (e.g. 1024); report the quality drop. Brute-force cosine in numpy. No vector database.
+- **Model selection (Phase 0, about 30 minutes, then stop).** Do not start from a fixed list. Survey what
+  already exists on Hugging Face: the MTEB retrieval leaderboard and the `sentence-transformers` library
+  tag, filtered by size, licence and runnability on the target hardware. Shortlist **2 to 3** models and
+  log, for each, why it made the cut (score, size, licence, dtype notes) in `DECISIONS.md`.
+  Always include one small model (about 0.5B parameters or less) as the baseline. Candidates to look at
+  first, **IDs must be verified on the Hub** (rule 8): `Qwen/Qwen3-Embedding-0.6B`, a Gemma-based
+  embedding model (check for the current `google/embeddinggemma-*` ID and its dtype warnings),
+  `BAAI/bge-m3`, and one small, fast model (e.g. a MiniLM/BGE-small class model) as a floor.
+  A bigger model is only worth trying if it passes the hardware gate below.
+- **Hardware gate (applies to every candidate before any full embedding run).** The model must:
+  (a) load on this Colab without exhausting the ~12 GB system RAM (load straight to the GPU, use
+  `low_cpu_mem_usage`/`device_map` where supported; a model whose fp16 weights exceed ~6 GB is
+  excluded unless you show it loads), and (b) meet the query-time budget in `PLAN.md` on 2 CPU threads.
+  Measure latency by limiting threads (`torch.set_num_threads(2)`), not by assuming. A model that fails
+  the gate is recorded as "excluded: reason + the number you saw" in `RESULTS.md`; this is a valid
+  outcome, not a failure.
+- **Prefixes and prompts:** read them from the model card, never from memory. Example: Qwen3 embedding
+  models take an instruction prefix on queries (`Instruct: {task}\nQuery: {query}`) and none on
+  documents; use sentence-transformers `prompt_name="query"` if the card supports it. Try one or two
+  task wordings and record which you used.
+- **Storage:** L2-normalise; store as `.npy`. For each finalist test fp32 vs fp16 storage and, if the
+  model supports Matryoshka truncation, full vs truncated dimension (e.g. 1024, 512); report the
+  quality drop and index size. Brute-force cosine in numpy. No vector database.
 - **Embed script:** `embed.py --model X --out DIR`, resumable (write shards, skip existing),
   sort by length for batching, halve batch size on OOM, run unmodified in a Colab cell.
 
@@ -106,7 +141,8 @@ Subtitles are dialogue only, so descriptions rarely share wording with the text.
 
 ## Out of scope unless the user asks
 
-LLM scene summaries, HyDE query rewriting, cross-encoder reranking, a web UI. If the baseline is
+training or fine-tuning embedding models, LLM scene summaries, HyDE query rewriting, cross-encoder
+reranking, a web UI. If the baseline is
 weak, record that in `RESULTS.md` and recommend these there. Do not build them unprompted.
 
 ## Publishing note

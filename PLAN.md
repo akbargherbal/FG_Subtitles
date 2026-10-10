@@ -31,9 +31,11 @@ They must never be mixed into headline numbers.
 
 **Chunking**
 - [ ] Three chunkers built (`gap`, `w8`, `w20`) per `AGENTS.md`; each cue appears in at least one chunk (tested).
+      Tail-window cases (n = 31, 36, 37, 48 cues) are tested per the tail rule in `AGENTS.md`.
 - [ ] For each chunker, report chunk count and the distribution of n_cues and tokens (min, p10, median, p90, max).
 - [ ] No `gap` chunk exceeds 30 cues or is under 6 cues, except where an episode is too short to satisfy this (report any exceptions).
-- [ ] Chunker comparison done with Qwen3-Embedding-0.6B on the user's eval queries, reported in `RESULTS.md`.
+- [ ] Chunker comparison done with the Phase 0 baseline model (the small model, default
+      Qwen3-Embedding-0.6B) on the user's eval queries, reported in `RESULTS.md`.
       `gap` stays the default unless another chunker beats it on recall@10 by at least 0.10 absolute **and**
       does not lose on MRR; otherwise keep `gap` and say the difference was not conclusive
       (the eval set is small, so differences below that are treated as noise).
@@ -45,33 +47,52 @@ They must never be mixed into headline numbers.
 - [ ] `--hybrid` is evaluated against semantic-only and lexical-only on the same queries.
 - [ ] `RESULTS.md` has one table: model, dtype, dimension, recall@10, MRR, index size, query-model download size,
       query latency on CPU (measured) . Final model chosen from these numbers only. No claims without numbers.
-- [ ] fp16 vs fp32 and (for Qwen 4B) full vs truncated dimension compared. Quality change reported.
+- [ ] fp16 vs fp32 storage compared for each finalist and, where the model supports it, full vs truncated
+      dimension. Quality change reported.
+- [ ] **Hardware gate** (see `AGENTS.md`): every candidate is checked against the query budget in
+      Constraints on 2 CPU threads. Models that fail are listed as excluded with the measured number.
+- [ ] **Model choice rule.** Choose the smallest model that passes the hardware gate. A larger model
+      replaces it only if it gains at least 0.10 absolute recall@10 **and** does not lose on MRR.
+      Otherwise keep the smaller one and say the difference was not conclusive. The eval set is small
+      (one query is 1/N of recall@10), so smaller differences are treated as noise.
 
 **Delivery**
 - [ ] Fresh clone + empty cache: `search.py --semantic "..."` prompts with sizes, downloads from Hugging Face,
       verifies checksums, and returns results.
 - [ ] Search refuses to run if the query model does not match `manifest.json`.
 - [ ] `README.md` documents all modes with copy-pasteable examples and the Colab indexing steps.
-- [ ] Work is on branch `rag-search`, pushed, with a PR opened against `main`.
+- [ ] Work is on branch `rag-search`. A push to `origin` happened at the end of every phase (check
+      `git log origin/rag-search`). A draft PR against `main` was opened after Phase 1 and is marked
+      ready at the end.
 
 ## Constraints
 
-- T4 16 GB for indexing: fp16 for Qwen, fp32 for EmbeddingGemma 2 (verify on the model card).
+- Indexing hardware: Colab T4 (16 GB VRAM), ~12 GB system RAM, 2 vCPU. Choose dtype per model from its
+  model card (e.g. fp16 for Qwen; some Gemma-based models need fp32), verified at run time.
 - Do not modify `data/*.db`. Commit no file over 50 MB. No vectors, `.npy` or `fts.db` in git.
 - No tokens or secrets in any file, log or commit. No force-push.
-- Queries must run on CPU (8 vCPU / 32 GB).
+- Queries must run on CPU on a small machine (2 vCPU / ~12 GB). **Query budget (proposed defaults,
+  the user may change them):** query-model download <= 2 GB; peak RAM while querying <= 6 GB; median
+  warm query latency <= 2 s on 2 threads; index download <= 500 MB. Measure all four.
 - Stop-and-ask list is in `AGENTS.md`.
 
 ## Phases
 
-Commit after each phase. Update ticks in the same commit.
+At the end of each phase: commit, update ticks in the same commit, **push to `origin rag-search`**.
+The phase is not done until the push succeeded.
 
-- [ ] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage and size rules; report distributions.
+- [ ] **0. Model survey (about 30 minutes).** Survey Hugging Face per `AGENTS.md`, shortlist 2 to 3 models
+  including a small baseline, check each against the hardware gate (load and 2-thread latency on a handful
+  of texts), log the shortlist and reasons in `DECISIONS.md`. No full embedding yet. Push.
+- [ ] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage, size rules
+  and tail-window cases; report distributions. After the first push, open the draft PR against `main`.
 - [ ] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
-- [ ] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with Qwen3-0.6B (CPU allowed). Sanity check on the smoke set.
-- [ ] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with Qwen3-0.6B, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
-- [ ] **4. Full embedding.** With the chosen chunker, run Qwen3-0.6B, Qwen3-4B, EmbeddingGemma 2 on the full corpus. Record wall time per model.
-- [ ] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension comparison. Choose the final model.
+- [ ] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with the baseline model (CPU allowed). Sanity check on the smoke set.
+- [ ] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with the baseline model, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
+- [ ] **4. Full embedding.** With the chosen chunker, embed the full corpus with each shortlisted model that passed the hardware gate.
+  Record wall time per model. Do not run a model that failed the gate.
+- [ ] **5. Evaluation.** `eval.py`, final `RESULTS.md`, hybrid vs semantic vs lexical, dtype and dimension
+  comparison. Choose the final model by the model choice rule.
 - [ ] **6. Delivery.** Hugging Face upload and `manifest.json`; on-demand download flow in `search.py`; `README.md`; push; open PR.
 
 ## Deliverables
