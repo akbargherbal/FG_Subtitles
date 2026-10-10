@@ -44,6 +44,59 @@ python family_guy.py json --season 21 --episode 1
 
 Use a different database with `--db PATH` or the `FAMILY_GUY_DB` env var.
 
+> **Looking for search?** See [Search](#search-exact--regex--semantic--hybrid) below for exact,
+> regex, semantic and hybrid search over the subtitles.
+
+## Search (exact / regex / semantic / hybrid)
+
+`search.py` is one CLI with four modes over the default subtitles (344 episodes, ~162k cues):
+
+| mode | backend | needs download / network? |
+|---|---|---|
+| `--exact "phrase"` | SQLite FTS5, **unstemmed** | no |
+| `--regex "pattern"` | Python `re` over cleaned cues | no |
+| `--semantic "description"` | embeddings + numpy cosine | yes (index + model) |
+| `--hybrid "description"` | FTS5 BM25 + embeddings, reciprocal rank fusion | yes |
+
+```bash
+# Exact (unstemmed) phrase, with timestamps accurate to ~20 s
+python search.py --exact "hours in the snakepit"
+
+# Raw FTS5 syntax, including NEAR()
+python search.py --exact "NEAR(peter lois, 4)" --raw
+
+# Regex over cleaned cue text (case-insensitive)
+python search.py --regex "shut up,? (meg|chris)" -i
+
+# Semantic: describe the scene, not the words
+python search.py --semantic "Peter does something foolish, gets more than he wished for, and regrets it"
+
+# Hybrid (add --yes to skip the download prompt)
+python search.py --hybrid "a father apologizes for not trusting his son" --yes
+```
+
+Common options: `--limit N`, `--season S`, `--episode E`, `--json`. Semantic modes add `--yes`,
+`--model` (refused if it differs from the index model), `--device cpu|cuda` and `--repo`.
+
+**Exact / regex are fully offline** - they build a local FTS5 index from the committed
+`chunks_w8.parquet` on first run (cache: `~/.cache/fg_subtitles/fts.db`).
+
+**Semantic / hybrid** download a prebuilt index from the Hugging Face dataset repo
+`akbargherbal/fg-subtitles-index` (private) plus the query model. On a cold cache the first run
+prompts with the sizes:
+
+```
+download index 31 MB + embedding model 1230 MB (~1261 MB total) from akbargherbal/fg-subtitles-index? [y/N]
+```
+
+then downloads (resumable), verifies SHA-256 against `manifest.json`, and caches under
+`~/.cache/fg_subtitles/index/`. The query model ships to the end user, so it is small and CPU-fast:
+**google/embeddinggemma-300m**, truncated to 512 dimensions (MRL) and stored fp16. Search refuses to
+run if the query model does not match `manifest.json`.
+
+Measured on 2 CPU threads: model download 1.23 GB, index download 31 MB, peak query RAM ~2.9 GB,
+median warm query latency ~157 ms.
+
 ## Library
 
 ```python
@@ -111,3 +164,26 @@ Extracted from `opensubtitles.org.dump.9180519.to.9521948.by.lang.2023.04.26`
 (`langs/eng.db`). Subtitle text and release names remain the property of their
 respective authors/uploaders; this repository only repackages metadata and text
 for convenient access.
+
+## Rebuilding the search index (one-time Colab T4 job)
+
+Query-time hardware is a small CPU box; indexing is a one-off run on a Colab T4. The pipeline:
+
+```bash
+# 1. Build the three chunkers (gap / w8 / w20) -> committed parquet files
+python chunk.py --all --report
+
+# 2. Embed the winning chunker with the chosen model (resumable shards)
+python embed.py --model google/embeddinggemma-300m --chunks chunks_w8.parquet \
+    --out emb_w8_gemma --dtype float32 --torch-dtype float32
+
+# 3. Evaluate (needs eval_queries.json)
+python eval.py --embeddings emb_w8_gemma --dim 512 --storage float16
+
+# 4. Build the deliverable index + manifest and publish to Hugging Face
+python publish.py --embeddings emb_w8_gemma --dim 512 --dtype float16 --out index \
+    --push --repo akbargherbal/fg-subtitles-index
+```
+
+See `colab_run.md` for copy-pasteable notebook cells and `RESULTS.md` / `DECISIONS.md` for the
+measured numbers behind the chosen model and chunker.

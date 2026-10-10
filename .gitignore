@@ -13,4 +13,5 @@ _shards/
 vectors/
 cache/
 emb_*/
+index/
 hf_upload/

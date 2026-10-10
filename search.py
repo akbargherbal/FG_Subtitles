@@ -17,6 +17,7 @@ Examples
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -24,6 +25,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
@@ -32,7 +34,11 @@ import chunk  # noqa: E402
 
 CACHE_DIR = Path(os.environ.get("FG_CACHE", Path.home() / ".cache" / "fg_subtitles"))
 FTS_PATH = CACHE_DIR / "fts.db"
+INDEX_DIR = CACHE_DIR / "index"
 PARQUET = HERE / "chunks_w8.parquet"
+
+HF_REPO = os.environ.get("FG_HF_REPO", "akbargherbal/fg-subtitles-index")
+HF_REPO_TYPE = "dataset"
 
 FTS_COLS = ["chunk_id", "season", "episode", "start", "end", "cue_from", "cue_to", "text"]
 
@@ -186,6 +192,116 @@ def search_regex(pattern: str, limit: int = 50, ignore_case: bool = False,
 
 
 # --------------------------------------------------------------------------- #
+# semantic / hybrid (needs a downloaded index + model)
+# --------------------------------------------------------------------------- #
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def fetch_manifest(index_dir: Path = INDEX_DIR, repo: str = HF_REPO, force: bool = False) -> dict:
+    from huggingface_hub import hf_hub_download
+    index_dir.mkdir(parents=True, exist_ok=True)
+    path = index_dir / "manifest.json"
+    if force or not path.exists():
+        p = hf_hub_download(repo_id=repo, filename="manifest.json",
+                            repo_type=HF_REPO_TYPE, local_dir=str(index_dir))
+        path = Path(p)
+    return json.loads(path.read_text())
+
+
+def _index_files_ok(manifest: dict, index_dir: Path) -> bool:
+    for name, want in ((manifest["embeddings_file"], manifest["embeddings_sha256"]),
+                       (manifest["chunks_file"], manifest["chunks_sha256"])):
+        p = index_dir / name
+        if not p.exists() or sha256_file(p) != want:
+            return False
+    return True
+
+
+def download_index(manifest: dict, index_dir: Path = INDEX_DIR, repo: str = HF_REPO,
+                   yes: bool = False) -> tuple[Path, Path]:
+    """Download + checksum-verify the index, prompting unless ``yes``."""
+    from huggingface_hub import hf_hub_download
+    index_dir.mkdir(parents=True, exist_ok=True)
+    if _index_files_ok(manifest, index_dir):
+        return index_dir / manifest["embeddings_file"], index_dir / manifest["chunks_file"]
+    if not yes:
+        idx_mb = (manifest["embeddings_bytes"] + manifest["chunks_bytes"]) / 1e6
+        model_mb = manifest.get("model_download_bytes", 0) / 1e6
+        reply = input(f"download index {idx_mb:.0f} MB + embedding model {model_mb:.0f} MB "
+                      f"(~{idx_mb + model_mb:.0f} MB total) from {repo}? [y/N] ")
+        if reply.strip().lower() not in ("y", "yes"):
+            raise SystemExit("aborted")
+    for name, want in ((manifest["embeddings_file"], manifest["embeddings_sha256"]),
+                       (manifest["chunks_file"], manifest["chunks_sha256"])):
+        p = Path(hf_hub_download(repo_id=repo, filename=name,
+                                 repo_type=HF_REPO_TYPE, local_dir=str(index_dir)))
+        if sha256_file(p) != want:
+            p.unlink(missing_ok=True)
+            raise SystemExit(f"checksum mismatch for {name}; removed, retry")
+    return index_dir / manifest["embeddings_file"], index_dir / manifest["chunks_file"]
+
+
+def _embed_query(query: str, model_id: str, dim: int, max_seq_length: int, device=None):
+    import torch
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(model_id, device=device)
+    model.max_seq_length = min(int(model.max_seq_length or max_seq_length), max_seq_length)
+    pname = "query" if "query" in (model.prompts or {}) else None
+    q = np.asarray(model.encode([query], prompt_name=pname, normalize_embeddings=True,
+                                convert_to_numpy=True, show_progress_bar=False))[0]
+    q = q[:dim]
+    return q / max(float(np.linalg.norm(q)), 1e-12)
+
+
+def semantic_search(query: str, limit: int = 10, index_dir: Path = INDEX_DIR,
+                    model_override: str | None = None, yes: bool = False,
+                    device: str | None = None, repo: str = HF_REPO) -> list[dict]:
+    manifest = fetch_manifest(index_dir, repo)
+    if model_override and model_override != manifest["model"]:
+        raise SystemExit(f"error: query model '{model_override}' does not match the index model "
+                         f"'{manifest['model']}' in manifest.json")
+    emb_path, chunks_path = download_index(manifest, index_dir, repo, yes)
+    q = _embed_query(query, manifest["model"], manifest["dimension"],
+                     manifest.get("max_seq_length", 512), device)
+    vectors = np.load(emb_path).astype(np.float32)
+    chunks = pd.read_parquet(chunks_path)
+    scores = vectors @ q.astype(np.float32)
+    k = min(limit, len(scores))
+    idx = np.argpartition(-scores, k - 1)[:k]
+    idx = idx[np.argsort(-scores[idx])]
+    return [dict(chunks.iloc[int(i)], score=float(scores[i]), mode="semantic") for i in idx]
+
+
+def rrf(lists: list[list[dict]], k: int = 60, top: int = 10) -> list[dict]:
+    scores: dict[tuple, float] = {}
+    items: dict[tuple, dict] = {}
+    for lst in lists:
+        for rank, row in enumerate(lst, start=1):
+            key = (int(row["season"]), int(row["episode"]), round(float(row["start"]), 1))
+            scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+            items.setdefault(key, row)
+    return [items[key] for key in sorted(scores, key=scores.get, reverse=True)[:top]]
+
+
+def hybrid_search(query: str, limit: int = 10, index_dir: Path = INDEX_DIR,
+                  model_override: str | None = None, yes: bool = False,
+                  device: str | None = None, repo: str = HF_REPO) -> list[dict]:
+    pool = max(limit, 20)
+    sem = semantic_search(query, pool, index_dir, model_override, yes, device, repo)
+    lex = search_keyword(query, pool)
+    for r in sem:
+        r["mode"] = "hybrid"
+    for r in lex:
+        r["mode"] = "hybrid"
+    return rrf([sem, lex], top=limit)
+
+
+# --------------------------------------------------------------------------- #
 # formatting
 # --------------------------------------------------------------------------- #
 def fmt_ts(seconds: float) -> str:
@@ -224,6 +340,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.add_argument("--rebuild-index", action="store_true", help="force FTS5 rebuild")
     p.add_argument("--yes", action="store_true", help="skip download confirmation (semantic)")
+    p.add_argument("--model", default=None,
+                   help="query model; refused if it differs from the index manifest")
+    p.add_argument("--device", default=None, help="cpu or cuda for the query model")
+    p.add_argument("--repo", default=HF_REPO, help="HF dataset repo holding the index")
     p.add_argument("--db", default=str(FTS_PATH))
     return p
 
@@ -247,9 +367,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: invalid regex: {e}", file=sys.stderr)
             return 2
     else:
-        print("semantic/hybrid search is wired up in the delivery phase "
-              "(needs the published index + model download).", file=sys.stderr)
-        return 3
+        # semantic / hybrid: prompt for download on a cold cache
+        query = args.semantic if args.semantic is not None else args.hybrid
+        try:
+            if args.semantic is not None:
+                results = semantic_search(query, args.limit, INDEX_DIR, args.model,
+                                          args.yes, args.device, args.repo)
+            else:
+                ensure_index(Path(args.db))  # lexical half of hybrid
+                results = hybrid_search(query, args.limit, INDEX_DIR, args.model,
+                                        args.yes, args.device, args.repo)
+        except SystemExit:
+            raise
+        except Exception as e:  # network/model failures -> clean message
+            print(f"error: {e}", file=sys.stderr)
+            return 4
     print_results(results, args.json)
     return 0
 
