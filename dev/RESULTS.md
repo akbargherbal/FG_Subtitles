@@ -13,9 +13,9 @@ median warm query latency <= 2 s on 2 CPU threads; index download <= 500 MB.
 ## Phase 0 - Model shortlist
 
 Hardware gate. One model per process; command for each:
-`python scripts/phase0_gate.py <model> <dtype>` (loads to CUDA, then `.to("cpu")` with
+`python dev/phase0_gate.py <model> <dtype>` (loads to CUDA, then `.to("cpu")` with
 `torch.set_num_threads(2)` and five warm queries). The script is committed at
-`scripts/phase0_gate.py`; the JSON it prints is pasted below.
+`dev/phase0_gate.py`; the JSON it prints is pasted below.
 
 | model | params | dim | dtype tested | weight file (MB) | licence | GPU peak (MB) | CPU RSS (MB) | median query (ms) | gate |
 |---|---|---|---|---|---|---|---|---|---|

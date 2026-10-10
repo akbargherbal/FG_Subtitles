@@ -1,0 +1,6 @@
+# Query-time and indexing dependencies.
+numpy>=1.26
+pandas>=2.0
+pyarrow>=14
+sentence-transformers>=5
+huggingface_hub>=0.34

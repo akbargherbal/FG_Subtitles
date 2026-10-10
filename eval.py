@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evaluate semantic / lexical / hybrid search against ``eval_queries.json``.
+"""Evaluate semantic / lexical / hybrid search against ``dev/eval_queries.json``.
 
-Hit definition (fixed, per PLAN.md)
------------------------------------
+Hit definition (fixed, per ``dev/PLAN.md``)
+-------------------------------------------
 A returned chunk counts as a **hit** if it is from an expected episode and, when
 the query gives a ``start`` time, the chunk's ``[start, end]`` interval contains
 that time within a tolerance of 30 s (i.e. ``chunk.start - 30 <= t <= chunk.end + 30``).
@@ -12,7 +12,7 @@ that time within a tolerance of 30 s (i.e. ``chunk.start - 30 <= t <= chunk.end 
 
 Modes
 -----
-    python eval.py --embeddings emb_gap_qwen --queries eval_queries.json
+    python eval.py --embeddings emb_gap_qwen --queries dev/eval_queries.json
     python eval.py --embeddings emb_gap_qwen --mode hybrid --query-model Qwen/Qwen3-Embedding-0.6B
     python eval.py --embeddings emb_gap_qwen --sanity 50
 """
@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--embeddings", default=None, help="dir from embed.py")
-    ap.add_argument("--queries", default=str(HERE / "eval_queries.json"))
+    ap.add_argument("--queries", default=str(HERE / "dev" / "eval_queries.json"))
     ap.add_argument("--mode", choices=["semantic", "lexical", "hybrid"], default="semantic")
     ap.add_argument("--topk", type=int, default=10)
     ap.add_argument("--query-model", default=None)

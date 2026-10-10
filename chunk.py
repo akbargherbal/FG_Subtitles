@@ -4,7 +4,7 @@
 Three chunkers are provided, all writing the same parquet schema:
 
 * ``gap``  - scene-aware default: break at silence gaps >= 3.0 s, merge tiny
-  segments, split long ones into overlapping windows (see ``AGENTS.md``).
+  segments, split long ones into overlapping windows (see ``dev/AGENTS.md``).
 * ``w8``   - baseline: fixed 8-cue windows, stride 6.
 * ``w20``  - baseline: fixed 20-cue windows, stride 15.
 
@@ -32,7 +32,7 @@ sys.path.insert(0, str(HERE))
 import family_guy as fg  # noqa: E402
 
 # --------------------------------------------------------------------------- #
-# Tunables (starting guesses from the measured gap distribution, per AGENTS.md)
+# Tunables (starting guesses from the measured gap distribution, per dev/AGENTS.md)
 # --------------------------------------------------------------------------- #
 GAP_THRESHOLD = 3.0   # seconds; break between cues at or above this silence
 MIN_CUES = 6          # merge any segment smaller than this into a neighbour

@@ -184,7 +184,7 @@ python chunk.py --all --report
 python embed.py --model google/embeddinggemma-300m --chunks chunks_w8.parquet \
     --out emb_w8_gemma --dtype float32 --torch-dtype float32
 
-# 3. Evaluate (needs eval_queries.json)
+# 3. Evaluate (needs dev/eval_queries.json)
 python eval.py --embeddings emb_w8_gemma --dim 512 --storage float16
 
 # 4. Build the deliverable index + manifest and publish to Hugging Face
@@ -192,5 +192,6 @@ python publish.py --embeddings emb_w8_gemma --dim 512 --dtype float16 --out inde
     --push --repo akbargherbal/fg-subtitles-index
 ```
 
-See `colab_run.md` for copy-pasteable notebook cells and `RESULTS.md` / `DECISIONS.md` for the
-measured numbers behind the chosen model and chunker.
+See `dev/colab_run.md` for copy-pasteable notebook cells and `dev/RESULTS.md` / `dev/DECISIONS.md`
+for the measured numbers behind the chosen model and chunker. The original plan and development
+notes live in `dev/` (see `dev/README.md`).
