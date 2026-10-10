@@ -103,6 +103,38 @@ def test_raw_near(db):
 
 
 # --------------------------------------------------------------------------- #
+# de-duplication
+# --------------------------------------------------------------------------- #
+def _row(season, episode, start, end):
+    return {"season": season, "episode": episode, "start": start, "end": end, "text": "x"}
+
+
+def test_dedupe_collapses_overlapping_same_episode():
+    rows = [
+        _row(4, 27, 1264, 1290),   # same scene, different windows
+        _row(4, 27, 1290, 1300),   # touches (no overlap) -> kept
+        _row(4, 27, 1276, 1302),   # overlaps the first -> dropped
+        _row(5, 1, 1276, 1302),    # same time, different episode -> kept
+    ]
+    kept = search.dedupe(rows)
+    assert [k["start"] for k in kept] == [1264, 1290, 1276]
+    assert kept[2]["episode"] == 1
+
+
+def test_exact_dedupe_collapses_overlapping_chunks(db):
+    phrase = "insists upon itself"
+    raw = search.search_exact(phrase, 10, False, db_path=db)
+    assert len(raw) >= 2, "expected overlapping windows for this repeated line"
+    # at least two of the raw results overlap in time
+    overlaps = sum(1 for i, a in enumerate(raw) for b in raw[i + 1:]
+                   if search._overlaps(a, b))
+    assert overlaps >= 1
+    kept = search.dedupe(raw)
+    assert len(kept) < len(raw)
+    assert not any(search._overlaps(a, b) for i, a in enumerate(kept) for b in kept[i + 1:])
+
+
+# --------------------------------------------------------------------------- #
 # regex vs independent check
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("pattern,icase", [

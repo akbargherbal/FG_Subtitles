@@ -302,6 +302,28 @@ def hybrid_search(query: str, limit: int = 10, index_dir: Path = INDEX_DIR,
 
 
 # --------------------------------------------------------------------------- #
+# de-duplication (overlapping chunks covering the same dialogue)
+# --------------------------------------------------------------------------- #
+def _overlaps(a: dict, b: dict) -> bool:
+    return (int(a["season"]) == int(b["season"]) and int(a["episode"]) == int(b["episode"])
+            and float(a["start"]) < float(b["end"]) and float(b["start"]) < float(a["end"]))
+
+
+def dedupe(results: list[dict]) -> list[dict]:
+    """Keep the best-ranked result when several chunks cover the same dialogue.
+
+    The w8 chunker overlaps neighbouring chunks by 2 cues, so the same lines can
+    appear in more than one result. Two results are treated as duplicates when
+    they are from the same episode and their [start, end] intervals overlap.
+    """
+    kept: list[dict] = []
+    for r in results:
+        if not any(_overlaps(r, k) for k in kept):
+            kept.append(r)
+    return kept
+
+
+# --------------------------------------------------------------------------- #
 # formatting
 # --------------------------------------------------------------------------- #
 def fmt_ts(seconds: float) -> str:
@@ -340,6 +362,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.add_argument("--rebuild-index", action="store_true", help="force FTS5 rebuild")
     p.add_argument("--yes", action="store_true", help="skip download confirmation (semantic)")
+    p.add_argument("--no-dedupe", action="store_true",
+                   help="keep overlapping chunks instead of collapsing duplicates")
     p.add_argument("--model", default=None,
                    help="query model; refused if it differs from the index manifest")
     p.add_argument("--device", default=None, help="cpu or cuda for the query model")
@@ -350,10 +374,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # fetch a larger pool when de-duplicating so the user still gets --limit distinct hits
+    fetch = args.limit if args.no_dedupe else max(args.limit * 3, args.limit + 20)
     if args.exact is not None:
         ensure_index(Path(args.db), force=args.rebuild_index)
         try:
-            results = search_exact(args.exact, args.limit, args.raw,
+            results = search_exact(args.exact, fetch, args.raw,
                                    args.season, args.episode, Path(args.db))
         except ValueError as e:
             print(f"error: {e}", file=sys.stderr)
@@ -361,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.regex is not None:
         ensure_index(Path(args.db), force=args.rebuild_index)
         try:
-            results = search_regex(args.regex, args.limit, args.ignore_case,
+            results = search_regex(args.regex, fetch, args.ignore_case,
                                    args.season, args.episode, Path(args.db))
         except re.error as e:
             print(f"error: invalid regex: {e}", file=sys.stderr)
@@ -371,18 +397,24 @@ def main(argv: list[str] | None = None) -> int:
         query = args.semantic if args.semantic is not None else args.hybrid
         try:
             if args.semantic is not None:
-                results = semantic_search(query, args.limit, INDEX_DIR, args.model,
+                results = semantic_search(query, fetch, INDEX_DIR, args.model,
                                           args.yes, args.device, args.repo)
             else:
                 ensure_index(Path(args.db))  # lexical half of hybrid
-                results = hybrid_search(query, args.limit, INDEX_DIR, args.model,
+                results = hybrid_search(query, fetch, INDEX_DIR, args.model,
                                         args.yes, args.device, args.repo)
         except SystemExit:
             raise
         except Exception as e:  # network/model failures -> clean message
             print(f"error: {e}", file=sys.stderr)
             return 4
-    print_results(results, args.json)
+    if not args.no_dedupe:
+        before = len(results)
+        results = dedupe(results)
+        if not args.json and before != len(results):
+            print(f"({before - len(results)} overlapping result(s) collapsed; "
+                  f"use --no-dedupe to keep them)", file=sys.stderr)
+    print_results(results[:args.limit], args.json)
     return 0
 
 

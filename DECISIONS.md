@@ -211,3 +211,25 @@ existed from Phase 3). Wall times: Qwen 240.2 s, embeddinggemma 213.4 s, bge-sma
   now sets visibility deterministically (`--public` for public, default private).
 - Fresh-clone + empty-cache test passed end to end (evidence in `RESULTS.md`), including a
   checksum-tamper recovery test.
+
+---
+
+## Duplicate results (2026-10-10, user-requested)
+
+The user noticed the same episode appearing more than once for one search. Investigation:
+
+- The DB holds **694** English subtitle files from many contributors, but the index uses only
+  `is_default = 1`: **344 rows, one per episode**; **0** episodes have more than one default and
+  **0** default texts are byte-identical. So alternate-contributor files are already excluded.
+- The real cause is **chunk overlap** in the winning `w8` chunker (window 8 / stride 6 -> every
+  consecutive chunk shares 2 cues). The same dialogue therefore appears in adjacent chunks and can
+  occupy several top-k slots (e.g. `S04E27 00:21:04` and `00:21:16`).
+
+**Fix:** `search.dedupe()` collapses results from the same episode whose `[start, end]` intervals
+overlap, keeping the best-ranked one. It is **on by default** for all four modes (the CLI fetches a
+3x pool first so `--limit` distinct hits are still returned) and can be disabled with `--no-dedupe`.
+Regex hits are individual cues, so dedupe is a no-op there.
+
+**Scope note:** `eval.py` scores the raw, undeduped ranking, so the recall@10 / MRR numbers in
+`RESULTS.md` are unchanged and remain comparable across models. Dedupe is a presentation/delivery
+filter, not part of the retrieval metric.

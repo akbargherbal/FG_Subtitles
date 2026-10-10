@@ -78,6 +78,10 @@ python search.py --hybrid "a father apologizes for not trusting his son" --yes
 Common options: `--limit N`, `--season S`, `--episode E`, `--json`. Semantic modes add `--yes`,
 `--model` (refused if it differs from the index model), `--device cpu|cuda` and `--repo`.
 
+Results are **de-duplicated by default**: the `w8` chunker overlaps neighbouring chunks by 2 cues,
+so the same scene can otherwise appear in several hits. Overlapping results from the same episode are
+collapsed to the best-ranked one. Pass `--no-dedupe` to see the raw overlapping chunks.
+
 **Exact / regex are fully offline** - they build a local FTS5 index from the committed
 `chunks_w8.parquet` on first run (cache: `~/.cache/fg_subtitles/fts.db`).
 
