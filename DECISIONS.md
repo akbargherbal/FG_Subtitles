@@ -114,3 +114,22 @@ delivery phase (6).
 - **`--regex` flags.** Case-sensitive by default (`-i` to fold); ordering is season, episode, start.
 - **Timestamp accuracy.** `--exact` returns the `w8` chunk's start/end, so a hit is within about
   20 s of the line (2-cue overlap covers phrases that straddle a chunk boundary), per the plan.
+
+---
+
+## Phase 2 - Embed script (2026-10-10)
+
+`embed.py` writes resumable shards and then reorders back to parquet row order, so `embeddings.npy`
+always aligns with the `chunks_used.parquet` written alongside it. This row alignment is what makes
+`eval.py` (Phase 5) unambiguous.
+
+- **Deviation / design choice.** Documents are embedded with `prompt_name="document"` when the model
+  defines a "document" prompt (Qwen: empty; EmbeddingGemma: `title: none | text: `). Queries use
+  `prompt_name="query"`. Prompts are read from `model.prompts` at run time, not hard-coded (rule 8).
+- `max_seq_length` is capped at **512** tokens by default. Measured chunks are <= ~300 tokens, so
+  this is safe and keeps padding cheap; the value is recorded in `meta.json`.
+- Storage dtype defaults to float32 (`--dtype float16` optional); compute dtype via `--torch-dtype`.
+- Resumability verified: a second run skipped the existing shard and produced the identical
+  `embeddings_sha256`; `--no-resume` rebuilt to the same hash.
+- `--sanity N` embeds N random chunks' own text as queries and reports the rank-1 rate; on the 40-chunk
+  smoke set it is 1.000 (20/20). The full 50-chunk, per-model sanity check is Phase 5.

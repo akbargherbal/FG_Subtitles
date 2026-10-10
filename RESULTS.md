@@ -137,6 +137,33 @@ S01E01  00:00:07  [exact]  MOM, DAD, I FOUND CIGARETTES IN GREG'S JACKET. ...
 Offline: `tests/test_search.py::test_lexical_offline_no_embedding_model` runs `import search` in a
 fresh interpreter and asserts neither `torch` nor `sentence_transformers` is loaded -> **False False**.
 
+## Phase 2 - Embed script
+
+`embed.py` writes resumable shards under `out/shards/`, then `embeddings.npy` (L2-normalised,
+**parquet row order**), `chunks_used.parquet` (row-aligned) and `meta.json`. Texts are embedded
+shortest-first and reordered back before saving. Batch size halves on CUDA OOM.
+
+Smoke test, 40 `gap` chunks across the first two S01 episodes, baseline model, GPU fp16:
+
+```
+$ python embed.py --model Qwen/Qwen3-Embedding-0.6B --chunks chunks_gap.parquet \
+      --out /tmp/opencode/smoke_gap_qwen --season 1 --limit 40 --dtype float16 \
+      --torch-dtype float16 --sanity 20
+  ... "count": 40, "dim": 1024, "load_seconds": 8.7, "embed_seconds": 1.3,
+      "embeddings_sha256": "8b896049...4199f", "num_shards": 1
+  SANITY rank1_rate=1.000 over 20 random chunks
+```
+
+Resumability (rerun skips the shard; `--no-resume` rebuilds to the same bytes):
+
+```
+$ python embed.py ... (same args)                 -> new_shards_this_run=0, sha256 8b896049...4199f
+$ python embed.py ... (same args, --no-resume)    -> new_shards_this_run=1, sha256 8b896049...4199f
+```
+
+Smoke sanity = **1.000** (20/20 verbatim queries rank their own chunk first). For 40 chunks a
+single shard suffices; the multi-shard path is exercised in Phase 4.
+
 ## Phase 3 - Chunker comparison
 
 _pending_
