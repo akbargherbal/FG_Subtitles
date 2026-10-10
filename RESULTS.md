@@ -276,8 +276,9 @@ configuration here.
 
 ## Delivery
 
-HF dataset repo: **`akbargherbal/fg-subtitles-index`** (created **private**; only the user may change
-visibility). Contents: `embeddings.npy` (25.7 MB), `chunks.parquet` (4.2 MB), `manifest.json`.
+HF dataset repo: **`akbargherbal/fg-subtitles-index`** (made **public** on 2026-10-10 at the user's
+request; it contains chunk text). Contents: `embeddings.npy` (25.7 MB), `chunks.parquet` (4.2 MB),
+`manifest.json`.
 `manifest.json` records model, dimension 512, dtype fp16, normalised=true, count 25910, chunker `w8`
 + all chunking parameters, file names/sizes/SHA-256, the winning chunker parquet hash
 (`source_parquet_sha256` == `chunks_sha256`, so vectors and chunks cannot drift), and the model

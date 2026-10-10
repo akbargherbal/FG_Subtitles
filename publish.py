@@ -98,9 +98,11 @@ def push(out: Path, repo: str, private: bool = True) -> None:
     from huggingface_hub import HfApi
     api = HfApi()
     api.create_repo(repo_id=repo, repo_type="dataset", private=private, exist_ok=True)
+    api.update_repo_settings(repo_id=repo, repo_type="dataset", private=private)
     api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=str(out),
                       commit_message="Add family-guy-subtitles search index")
-    print(f"pushed {out} -> https://huggingface.co/datasets/{repo}")
+    print(f"pushed {out} -> https://huggingface.co/datasets/{repo} "
+          f"({'private' if private else 'public'})")
 
 
 def main(argv=None) -> int:

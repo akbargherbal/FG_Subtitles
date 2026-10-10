@@ -72,13 +72,14 @@ re-run: existing shards under `emb_*/shards/` are skipped.
 !python eval.py --embeddings emb_w8_gemma --sanity 50
 ```
 
-## Cell 8 - build the index + manifest and publish to the (private) HF dataset repo
+## Cell 8 - build the index + manifest and publish to the (public) HF dataset repo
 
-Ask the user before pushing; keep the repo private unless told otherwise.
+The user approved making `akbargherbal/fg-subtitles-index` public (it carries chunk text), so
+`publish.py` runs with `--public`; without `--public` the repo is created private.
 
 ```bash
 !python publish.py --embeddings emb_w8_gemma --dim 512 --dtype float16 --out index \
-    --push --repo akbargherbal/fg-subtitles-index
+    --push --public --repo akbargherbal/fg-subtitles-index
 ```
 
 ## Cell 9 - smoke test the delivery flow (cold cache)

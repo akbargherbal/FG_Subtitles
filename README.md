@@ -82,7 +82,7 @@ Common options: `--limit N`, `--season S`, `--episode E`, `--json`. Semantic mod
 `chunks_w8.parquet` on first run (cache: `~/.cache/fg_subtitles/fts.db`).
 
 **Semantic / hybrid** download a prebuilt index from the Hugging Face dataset repo
-`akbargherbal/fg-subtitles-index` (private) plus the query model. On a cold cache the first run
+`akbargherbal/fg-subtitles-index` (public) plus the query model. On a cold cache the first run
 prompts with the sizes:
 
 ```

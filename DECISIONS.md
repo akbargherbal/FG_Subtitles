@@ -193,7 +193,8 @@ existed from Phase 3). Wall times: Qwen 240.2 s, embeddinggemma 213.4 s, bge-sma
 ## Phase 6 - Delivery (2026-10-10)
 
 - **HF dataset repo `akbargherbal/fg-subtitles-index` created private** (the user confirmed the name
-  and asked to keep it private). Contents: `embeddings.npy` (26.5 MB, fp16, 512-dim),
+  and asked to keep it private), then **made public on 2026-10-10 at the user's explicit request**.
+  Contents: `embeddings.npy` (26.5 MB, fp16, 512-dim),
   `chunks.parquet` (4.4 MB, copy of `chunks_w8.parquet`), `manifest.json`. `publish.py` builds the
   index (MRL truncation + re-normalise + dtype cast) and the manifest, then uploads.
 - **manifest.json** carries the model id, dimension, dtype, `normalized`, count, chunker + all
@@ -203,7 +204,10 @@ existed from Phase 3). Wall times: Qwen 240.2 s, embeddinggemma 213.4 s, bge-sma
   index+model sizes (unless `--yes`), downloads via `huggingface_hub` with `local_dir` (resumable),
   verifies SHA-256, and only then loads. `--model` is refused when it differs from the manifest model.
   Lexical modes never touch the network.
-- **Chunk text is only in the private repo**, never published publicly (per the AGENTS publishing
-  note); the code repo's visibility is unchanged.
+- **Visibility change (stop-and-ask item, user-authorized).** The repo was switched from private to
+  public with `HfApi.update_repo_settings(..., private=False)` on the user's instruction, which also
+  authorises publishing the chunk text it contains (the AGENTS publishing note requires asking
+  first). The code repo `akbargherbal/FG_Subtitles` visibility is unchanged. `publish.py --push`
+  now sets visibility deterministically (`--public` for public, default private).
 - Fresh-clone + empty-cache test passed end to end (evidence in `RESULTS.md`), including a
   checksum-tamper recovery test.
