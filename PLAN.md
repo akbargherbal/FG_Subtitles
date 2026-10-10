@@ -23,11 +23,11 @@ They must never be mixed into headline numbers.
 ## Acceptance criteria (fixed)
 
 **Lexical**
-- [ ] A known quote returns the correct episode(s) and a timestamp within about 20 s of the line via `--exact`. Tests cover a
+- [x] A known quote returns the correct episode(s) and a timestamp within about 20 s of the line via `--exact`. Tests cover a
       hyphenated phrase, an all-caps line, a line-wrapped phrase and a curly vs straight apostrophe.
-- [ ] `--exact` is unstemmed. `--raw` accepts FTS5 syntax including `NEAR(a b, n)`.
-- [ ] `--regex` results match an independent check (e.g. a plain Python loop or `grep` over the cleaned text) on at least 3 patterns.
-- [ ] Lexical modes work offline with no embedding model installed.
+- [x] `--exact` is unstemmed. `--raw` accepts FTS5 syntax including `NEAR(a b, n)`.
+- [x] `--regex` results match an independent check (e.g. a plain Python loop or `grep` over the cleaned text) on at least 3 patterns.
+- [x] Lexical modes work offline with no embedding model installed.
 
 **Chunking**
 - [x] Three chunkers built (`gap`, `w8`, `w20`) per `AGENTS.md`; each cue appears in at least one chunk (tested).
@@ -86,7 +86,7 @@ The phase is not done until the push succeeded.
   of texts), log the shortlist and reasons in `DECISIONS.md`. No full embedding yet. Push.
 - [x] **1. Chunking.** `chunk.py` builds the three chunkers and parquet files; tests for coverage, size rules
   and tail-window cases; report distributions. After the first push, open the draft PR against `main`.
-- [ ] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
+- [x] **1b. Lexical search.** Build FTS5 from `w8` chunks; implement `--exact` and `--regex` in `search.py`; add tests; lexical criteria pass.
 - [ ] **2. Embed script.** `embed.py` (resumable shards, Drive-safe). Smoke test on 2 episodes with the baseline model (CPU allowed). Sanity check on the smoke set.
 - [ ] **3. Chunker comparison.** Needs `eval_queries.json`. Embed all three chunkers with the baseline model, score recall@10 and MRR, choose the chunker by the rule in the criteria. Record it in `DECISIONS.md` and `RESULTS.md`.
 - [ ] **4. Full embedding.** With the chosen chunker, embed the full corpus with each shortlisted model that passed the hardware gate.

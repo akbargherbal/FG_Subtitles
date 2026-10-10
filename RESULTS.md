@@ -85,7 +85,57 @@ chunker=w20  chunks=10332  episodes=344
 
 ## Lexical search
 
-_pending_
+FTS5 index built from `chunks_w8.parquet` on first run (cache `~/.cache/fg_subtitles/fts.db`,
+git-ignored). Two FTS tables: `chunks_exact` (`unicode61`, unstemmed) and `chunks_porter`
+(`porter unicode61`), plus a plain `cues` table for `--regex`.
+
+Index build (cache cleared first): `rm -f ~/.cache/fg_subtitles/fts.db && time python search.py --exact snakepit`
+-> **4.5 s** wall (the `AGENTS.md` "< 1 s" figure was an estimate; actual is 4.5 s, logged in
+`DECISIONS.md`). `fts.db` = 42.4 MB.
+
+Tests: `python -m pytest tests/test_search.py -q` -> **11 passed** (part of 154 total).
+
+`--exact` evidence (S01E01 unless noted):
+
+```
+$ python search.py --exact "hours in the snakepit" --limit 1
+S01E01  00:00:16  [exact]  WILL BE 4 HOURS IN THE SNAKEPIT. ...
+
+$ python search.py --exact "LOST-MY-JOB" --limit 1
+S01E01  00:08:02  [exact]  ... THE LOST-MY-JOB SMELLS GREAT. ...
+
+$ python search.py --exact "I’M AFRAID" --limit 1        # curly apostrophe in the query
+S12E06  00:09:07  [exact]  ... I'm afraid that our Brian is dead! ...
+```
+
+Required test cases (all covered in `tests/test_search.py`, timestamps asserted within 20 s):
+hyphenated `LOST-MY-JOB`; all-caps `FOUND CIGARETTES IN GREG`; line-wrapped
+`HOURS IN THE SNAKEPIT` (split over two source lines / two cues, joined by cleaning + the
+2-cue chunk overlap); curly-vs-straight apostrophe (`I’M AFRAID` == `I'M AFRAID`).
+
+Unstemmed + raw:
+
+```
+$ python search.py --exact "cigarette" --season 1 --episode 1       # unstemmed: no match
+no results
+$ python -c "import search; print(len(search.search_porter('cigarette',10,1,1)))"   # porter: match
+1
+$ python search.py --exact "NEAR(cigarettes greg, 5)"               # quoted by default -> NEAR is literal
+no results
+$ python search.py --exact "NEAR(cigarettes greg, 5)" --raw --limit 1
+S01E01  00:00:07  [exact]  MOM, DAD, I FOUND CIGARETTES IN GREG'S JACKET. ...
+```
+
+`--regex` vs independent `grep -E` over cleaned cues (155649 cues written by an independent script):
+
+| pattern | flags | grep count | search.py count |
+|---|---|---|---|
+| `snake.?pit` | -i | 1 | 1 |
+| `\bpancakes?\b` | -i | 38 | 38 |
+| `[A-Z]{6,}!` | none | 1267 | 1267 |
+
+Offline: `tests/test_search.py::test_lexical_offline_no_embedding_model` runs `import search` in a
+fresh interpreter and asserts neither `torch` nor `sentence_transformers` is loaded -> **False False**.
 
 ## Phase 3 - Chunker comparison
 

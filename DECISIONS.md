@@ -89,3 +89,28 @@ Observations: 10212 gap chunks, 25910 w8 chunks, 10332 w20 chunks. `gap` chunk s
 6-30 cues; the merge-then-split path can extend the last window to at most 21 cues (tail < 6 plus a
 16-cue stride), still under the 30 ceiling. No undersized chunks at all - no episode is short enough
 to trigger the "too short" exception.
+
+---
+
+## Phase 1b - Lexical search (2026-10-10)
+
+`search.py` implements `--exact` (FTS5 unstemmed) and `--regex` (Python `re`) offline.
+`--semantic` / `--hybrid` currently exit with a clear message; they are completed in the
+delivery phase (6).
+
+- **Index.** Built from the committed `chunks_w8.parquet` on first run into
+  `~/.cache/fg_subtitles/fts.db` (git-ignored). Tables: `chunks_exact` (`unicode61`),
+  `chunks_porter` (`porter unicode61`), and a plain `cues` table for regex.
+- **Deviation from `AGENTS.md`.** The file assumed FTS "rebuilt in under a second". Measured:
+  **4.5 s** (parsing 344 episodes + inserting 155649 cues + 2x25910 FTS rows, then VACUUM).
+  Still cheap and done automatically on first run, so the "do not commit" decision stands, but the
+  number in `AGENTS.md` was optimistic.
+- **Music/♪ handling affects cue count.** Cleaning drops music/♪ lines and any cue left with no
+  text, so the cleaned cue count is **155649** vs the raw 161734 integer-index lines. All lexical
+  modes use the cleaned cues.
+- **Quoting.** Free text is normalised (curly -> straight) and wrapped in a single FTS5 phrase,
+  with embedded `"` doubled. FTS5 operators (e.g. `NEAR(a b, 5)`) only take effect under `--raw`,
+  which passes the string through unchanged and reports a clean error for invalid syntax.
+- **`--regex` flags.** Case-sensitive by default (`-i` to fold); ordering is season, episode, start.
+- **Timestamp accuracy.** `--exact` returns the `w8` chunk's start/end, so a hit is within about
+  20 s of the line (2-cue overlap covers phrases that straddle a chunk boundary), per the plan.
