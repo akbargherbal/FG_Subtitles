@@ -3,3 +3,15 @@ __pycache__/
 .pytest_cache/
 *.srt
 subs/
+
+# Phase 1+ artifacts: never commit vectors, arrays or the FTS index.
+*.npy
+*.npz
+*.faiss
+fts.db
+_shards/
+vectors/
+cache/
+emb_*/
+index/
+hf_upload/

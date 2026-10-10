@@ -1,0 +1,122 @@
+[
+  {
+    "query": "a character becomes an overnight television sensation and lets the fame go to his head",
+    "expected": [{"season": 1, "episode": 4, "start": "00:14:10"}],
+    "note": "synthetic query generated from the gap chunk at S01E04 850s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "someone is jealous because a friend is stealing all the attention and tries to outdo him",
+    "expected": [{"season": 1, "episode": 5, "start": "00:10:21"}],
+    "note": "synthetic query generated from the gap chunk at S01E05 621s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a family argues about whether their son should leave home for a big opportunity",
+    "expected": [{"season": 2, "episode": 11, "start": "00:14:24"}],
+    "note": "synthetic query generated from the gap chunk at S02E11 864s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a man who is being hunted by the mob tries to hide by attending a wedding",
+    "expected": [{"season": 2, "episode": 16, "start": "00:16:15"}],
+    "note": "synthetic query generated from the gap chunk at S02E16 975s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a family stages an intervention for a loved one's strange addiction",
+    "expected": [{"season": 3, "episode": 1, "start": "00:17:57"}],
+    "note": "synthetic query generated from the gap chunk at S03E01 1077s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a woman bets she can teach someone to speak with a proper accent and regrets it",
+    "expected": [{"season": 3, "episode": 4, "start": "00:09:24"}],
+    "note": "synthetic query generated from the gap chunk at S03E04 564s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "someone gets distracted while babysitting and loses the child",
+    "expected": [{"season": 4, "episode": 19, "start": "00:12:49"}],
+    "note": "synthetic query generated from the gap chunk at S04E19 769s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a character is offered a physical reward to sabotage a petition",
+    "expected": [{"season": 4, "episode": 25, "start": "00:12:14"}],
+    "note": "synthetic query generated from the gap chunk at S04E25 734s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "two men fight over a customer",
+    "expected": [{"season": 5, "episode": 11, "start": "00:05:50"}],
+    "note": "synthetic query generated from the gap chunk at S05E11 350s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "people are turned away from an institution because of who they are",
+    "expected": [{"season": 5, "episode": 16, "start": "00:14:48"}],
+    "note": "synthetic query generated from the gap chunk at S05E16 888s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "friends play a game asking uncomfortable hypothetical questions",
+    "expected": [{"season": 6, "episode": 3, "start": "00:03:28"}],
+    "note": "synthetic query generated from the gap chunk at S06E03 208s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "friends complain that a movie they just watched had no coherent story",
+    "expected": [{"season": 7, "episode": 4, "start": "00:03:19"}],
+    "note": "synthetic query generated from the gap chunk at S07E04 199s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a man is about to lose a large amount of money gambling",
+    "expected": [{"season": 7, "episode": 7, "start": "00:09:39"}],
+    "note": "synthetic query generated from the gap chunk at S07E07 579s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a family visits a carnival and wins an odd prize",
+    "expected": [{"season": 8, "episode": 1, "start": "00:00:56"}],
+    "note": "synthetic query generated from the gap chunk at S08E01 56s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a husband is jealous of his wife's new male friend",
+    "expected": [{"season": 8, "episode": 7, "start": "00:08:08"}],
+    "note": "synthetic query generated from the gap chunk at S08E07 488s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "parents end an experiment after admitting their children had it harder",
+    "expected": [{"season": 9, "episode": 13, "start": "00:14:27"}],
+    "note": "synthetic query generated from the gap chunk at S09E13 867s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "people dive into a lake to retrieve discarded luxury cars",
+    "expected": [{"season": 10, "episode": 14, "start": "00:03:38"}],
+    "note": "synthetic query generated from the gap chunk at S10E14 218s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "someone argues it is more profitable to treat a disease than to cure it",
+    "expected": [{"season": 11, "episode": 3, "start": "00:16:32"}],
+    "note": "synthetic query generated from the gap chunk at S11E03 992s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a character builds an artificial companion and treats it like a friend",
+    "expected": [{"season": 14, "episode": 3, "start": "00:09:33"}],
+    "note": "synthetic query generated from the gap chunk at S14E03 573s; not user-verified",
+    "synthetic": true
+  },
+  {
+    "query": "a father apologizes for not trusting his son with responsibility",
+    "expected": [{"season": 15, "episode": 19, "start": "00:19:12"}],
+    "note": "synthetic query generated from the gap chunk at S15E19 1152s; not user-verified",
+    "synthetic": true
+  }
+]
