@@ -12,3 +12,5 @@ fts.db
 _shards/
 vectors/
 cache/
+emb_*/
+hf_upload/
